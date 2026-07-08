@@ -32,10 +32,11 @@ export function DividendCalendar() {
 
   return (
     <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-        <Stat label="Projekce příjmu / 12 měsíců" value={czk(d.annualIncomeCzk)} tone />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <Stat label="Příjem / 12 měsíců" value={czk(d.annualIncomeCzk)} tone />
         <Stat label="Průměrně měsíčně" value={czk(monthly)} />
-        <Stat label="Dividendových titulů" value={`${d.payers}`} />
+        <Stat label="z toho dividendy" value={czk(d.dividendCzk ?? 0)} />
+        <Stat label="z toho úroky (netto)" value={czk(d.interestCzk ?? 0)} />
       </div>
 
       <IncomeChart data={d.byMonth} />
@@ -55,7 +56,7 @@ export function DividendCalendar() {
             {upcoming.map((p: any, i: number) => (
               <tr key={i} className="border-b border-line/50">
                 <td className="py-2">{p.instrument}</td>
-                <td className="py-2 tabular-nums text-muted">{shortDate(p.exDate)}</td>
+                <td className="py-2 tabular-nums text-muted">{p.kind === "interest" ? "—" : shortDate(p.exDate)}</td>
                 <td className="py-2 tabular-nums text-muted">
                   {shortDate(p.payDate)}
                   {p.estimatedPay && <span className="text-[10px] ml-1 text-muted/70">(odhad)</span>}
@@ -68,8 +69,8 @@ export function DividendCalendar() {
       </div>
 
       <p className="text-muted text-[11px] mt-3">
-        Projekce z aktuálního počtu akcií a poslední dividendy (extrapolovaná kadence). Ex/pay date z Nasdaqu (reálné) nebo Yahoo
-        (pay date odhad). Nezohledňuje růst ani škrty dividend.
+        Dividendy: podle počtu akcií k ex-dni a poslední dividendy (extrapolovaná kadence), ex/pay date z Nasdaqu (reálné) nebo
+        Yahoo (pay date odhad). Úroky: ze spořicích účtů, netto po 15% srážkové dani, výplata 1. dne měsíce. Nezohledňuje růst ani škrty.
       </p>
     </div>
   );

@@ -3,6 +3,7 @@ import { loadExport } from "@/lib/store";
 import { reconstructPortfolio } from "@/lib/positions";
 import { fetchChart, fetchFxCzk } from "@/lib/prices";
 import { fetchDividendMeta, projectPayments } from "@/lib/divcalendar";
+import { loadCash, monthlyNetInterest } from "@/lib/cash";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
     incomeCzk: number;
     estimatedPay: boolean;
     source: string;
+    kind: "dividend" | "interest";
   }
 
   // Shares held as of a given date (dividend eligibility is set at the ex-date,
@@ -70,10 +72,10 @@ export async function GET(req: NextRequest) {
         incomeCzk: p.perShare * qualifyingShares * rate,
         estimatedPay: p.estimatedPay,
         source: meta.source,
+        kind: "dividend",
       });
     }
   }
-  payments.sort((a, b) => a.exDate.localeCompare(b.exDate));
 
   // Fixed 12-month window starting at the current month (e.g. 2026-07).
   const now = new Date();
@@ -84,16 +86,46 @@ export async function GET(req: NextRequest) {
   const windowSet = new Set(monthKeys);
   const startMonth = monthKeys[0];
 
+  // Interest from external savings accounts: net of withholding tax, credited on
+  // the 1st of each month in the window.
+  const cash = await loadCash();
+  for (const acc of cash.accounts) {
+    if (acc.ratePct <= 0 || acc.balance <= 0) continue;
+    const net = monthlyNetInterest(acc, cash.interestTaxPct);
+    for (const m of monthKeys) {
+      const date = `${m}-01`;
+      payments.push({
+        ticker: `CASH:${acc.name}`,
+        instrument: `${acc.name} (úrok)`,
+        exDate: date,
+        payDate: date,
+        perShare: 0,
+        currency: "CZK",
+        shares: 0,
+        incomeCzk: net,
+        estimatedPay: false,
+        source: "cash",
+        kind: "interest",
+      });
+    }
+  }
+
+  payments.sort((a, b) => a.payDate.localeCompare(b.payDate));
+
   // Only payments landing within the window; bucket by pay-date month.
   const inWindow = payments.filter((p) => windowSet.has(p.payDate.slice(0, 7)));
   const byMonthMap = new Map<string, number>(monthKeys.map((m) => [m, 0]));
   for (const p of inWindow) byMonthMap.set(p.payDate.slice(0, 7), (byMonthMap.get(p.payDate.slice(0, 7)) ?? 0) + p.incomeCzk);
   const byMonth = monthKeys.map((month) => ({ month, income: byMonthMap.get(month) ?? 0 }));
   const annualIncomeCzk = inWindow.reduce((s, p) => s + p.incomeCzk, 0);
+  const dividendCzk = inWindow.filter((p) => p.kind === "dividend").reduce((s, p) => s + p.incomeCzk, 0);
+  const interestCzk = inWindow.filter((p) => p.kind === "interest").reduce((s, p) => s + p.incomeCzk, 0);
 
   return NextResponse.json({
     available: true,
     annualIncomeCzk,
+    dividendCzk,
+    interestCzk,
     byMonth,
     payments: inWindow,
     windowStart: startMonth,

@@ -4,6 +4,7 @@ import { reconstructPortfolio, type Holding } from "@/lib/positions";
 import { fetchQuote, fetchFxCzk } from "@/lib/prices";
 import { buildValueSeries, computePerformance, computeRiskMetrics, buildBenchmark } from "@/lib/timeseries";
 import { fetchProfile } from "@/lib/finnhub";
+import { loadCash, freeCashTotal } from "@/lib/cash";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,6 +100,8 @@ export async function GET(req: NextRequest) {
   }
 
   const dividendTtmTotal = holdings.reduce((s, h) => s + h.dividendTtmCzk, 0);
+  const cash = await loadCash();
+  const freeCash = freeCashTotal(cash);
 
   return NextResponse.json({
     imported: true,
@@ -114,6 +117,8 @@ export async function GET(req: NextRequest) {
       dividendTtmTotal,
       dividendYieldOnCostPct: summary.totalCostBasis > 0 ? (dividendTtmTotal / summary.totalCostBasis) * 100 : 0,
       dividendForwardYieldPct: totalMarketValue > 0 ? (dividendTtmTotal / totalMarketValue) * 100 : 0,
+      freeCash,
+      cashAccounts: cash.accounts,
     },
     holdings,
     series,

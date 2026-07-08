@@ -145,7 +145,12 @@ export default function Page() {
       {error && <p className="text-neg mb-4 text-sm">{error}</p>}
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <Kpi
+          label="Volná hotovost"
+          value={czk(s.freeCash ?? 0)}
+          sub={(s.cashAccounts ?? []).map((a: any) => a.name).join(" + ") || undefined}
+        />
         <Kpi label="Tržní hodnota" value={czk(s.totalMarketValue)} />
         <Kpi
           label="Nerealizovaný zisk"
@@ -260,7 +265,7 @@ export default function Page() {
 
       {/* Dividend projection / calendar */}
       <div className="mt-6">
-        <Section title="Dividendová projekce" subtitle="Očekávaný příjem na 12 měsíců podle aktuálních pozic + kalendář ex-dividend a výplat">
+        <Section title="Projekce příjmů" subtitle="Očekávaný příjem na 12 měsíců: dividendy (podle akcií k ex-dni) + úroky ze spořicích účtů (netto po 15% dani)">
           <DividendCalendar />
         </Section>
       </div>
