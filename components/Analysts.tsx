@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { InfoTip } from "@/components/InfoTip";
 
 const money = (v: number, ccy: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy || "USD", maximumFractionDigits: 2 }).format(v ?? 0);
@@ -98,7 +99,10 @@ export function AnalystPanel({ holdings }: { holdings: Holding[] }) {
         <div className="grid md:grid-cols-2 gap-6">
           {/* Price target */}
           <div>
-            <div className="stat-label">Cílová cena (12 měsíců)</div>
+            <div className="stat-label">
+              Cílová cena (12 měsíců)
+              <InfoTip text="Průměrná 12měsíční cílová cena analytiků. Potenciál = rozdíl vůči aktuální ceně." />
+            </div>
             <div className={`text-3xl font-semibold mt-1 ${up != null && up >= 0 ? "text-pos" : "text-neg"}`}>
               {money(a.targetPrice, ccy)}
             </div>

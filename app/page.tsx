@@ -14,6 +14,7 @@ import {
 import { AnalystPanel } from "@/components/Analysts";
 import { StockDetail } from "@/components/StockDetail";
 import { DividendCalendar } from "@/components/DividendCalendar";
+import { InfoTip } from "@/components/InfoTip";
 
 type Data = any;
 const VALUE_FROM = "2024-10-31"; // value-over-time chart starts here
@@ -150,25 +151,41 @@ export default function Page() {
           label="Volná hotovost"
           value={czk(s.freeCash ?? 0)}
           sub={(s.cashAccounts ?? []).map((a: any) => a.name).join(" + ") || undefined}
+          hint="Hotovost na spořicích účtech mimo XTB. Nastavuje se v data/cash.json."
         />
-        <Kpi label="Tržní hodnota" value={czk(s.totalMarketValue)} />
+        <Kpi
+          label="Tržní hodnota"
+          value={czk(s.totalMarketValue)}
+          hint="Aktuální hodnota držených akcií: počet kusů × živá cena × kurz do CZK."
+        />
         <Kpi
           label="Nerealizovaný zisk"
           value={czk(s.totalUnrealized)}
           sub={pct(s.totalUnrealizedPct)}
           tone={s.totalUnrealized >= 0 ? "pos" : "neg"}
+          hint="Tržní hodnota mínus pořizovací cena držených akcií — zisk na papíře, dokud neprodáš. % je vůči pořizovací ceně."
         />
-        <Kpi label="Realizovaný zisk" value={czk(s.totalRealizedPnl)} tone={s.totalRealizedPnl >= 0 ? "pos" : "neg"} />
+        <Kpi
+          label="Realizovaný zisk"
+          value={czk(s.totalRealizedPnl)}
+          tone={s.totalRealizedPnl >= 0 ? "pos" : "neg"}
+          hint="Zisk/ztráta z už prodaných akcií, počítáno metodou FIFO (v CZK)."
+        />
         <Kpi
           label="Dividendy (netto)"
           value={czk(s.totalDividendsGross + s.totalWithholdingTax)}
           sub={`brutto ${czk(s.totalDividendsGross)}`}
           tone="pos"
+          hint="Všechny přijaté dividendy za celou historii po odečtení srážkové daně. V závorce hrubá výše."
         />
       </div>
 
       {/* Value over time */}
-      <Section title="Hodnota portfolia v čase" subtitle="Tržní hodnota vs. pořizovací cena držených pozic (CZK)">
+      <Section
+        title="Hodnota portfolia v čase"
+        subtitle="Tržní hodnota vs. pořizovací cena držených pozic (CZK)"
+        hint="Modrá = tržní hodnota akcií, oranžová = jejich pořizovací cena (FIFO). Svislý rozdíl = nerealizovaný zisk. Ceny přepočteny dnešním kurzem."
+      >
         {series?.length ? (
           <ValueChart data={series} />
         ) : (
@@ -181,6 +198,7 @@ export default function Page() {
         <Section
           title="Výkonnost portfolia"
           subtitle="Sloupce = zisk/ztráta v Kč · výnos počítán jako TWR (nezávislý na vkladech)"
+          hint="Zisk/ztráta za období očištěná o vklady a výběry. Výnos v tooltipu je TWR (time-weighted) — čistá výkonnost titulů nezávislá na tom, kdy a kolik jsi vložila."
           action={
             <Toggle
               value={perfMode}
@@ -198,13 +216,36 @@ export default function Page() {
 
       {/* Benchmark vs S&P 500 + risk metrics */}
       <div className="mt-6">
-        <Section title="Výkonnost vs. trh" subtitle="Tvé portfolio (TWR) vs. S&P 500, přepočteno na 100 k počátku">
+        <Section
+          title="Výkonnost vs. trh"
+          subtitle="Tvé portfolio (TWR) vs. S&P 500, přepočteno na 100 k počátku"
+          hint="Obě křivky startují na 100. ^GSPC je cenový index bez dividend, takže reálný náskok S&P je mírně vyšší (o dividendy)."
+        >
           {risk && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <MiniStat label="Roční výnos (p.a.)" value={pct(risk.annualizedReturn * 100)} tone={risk.annualizedReturn >= 0 ? "pos" : "neg"} />
-              <MiniStat label="Volatilita (p.a.)" value={`${(risk.volatility * 100).toFixed(1)} %`} />
-              <MiniStat label="Max. pokles" value={`${(risk.maxDrawdown * 100).toFixed(1)} %`} tone="neg" />
-              <MiniStat label="Sharpe ratio" value={risk.sharpe.toFixed(2)} tone={risk.sharpe >= 1 ? "pos" : undefined} />
+              <MiniStat
+                label="Roční výnos (p.a.)"
+                value={pct(risk.annualizedReturn * 100)}
+                tone={risk.annualizedReturn >= 0 ? "pos" : "neg"}
+                hint="Anualizovaný time-weighted výnos portfolia (nezávislý na načasování a velikosti vkladů)."
+              />
+              <MiniStat
+                label="Volatilita (p.a.)"
+                value={`${(risk.volatility * 100).toFixed(1)} %`}
+                hint="Kolísavost denních výnosů, anualizovaná (směr. odchylka × √252). Vyšší = rizikovější."
+              />
+              <MiniStat
+                label="Max. pokles"
+                value={`${(risk.maxDrawdown * 100).toFixed(1)} %`}
+                tone="neg"
+                hint="Největší propad z vrcholu na následné dno (max drawdown) za sledované období."
+              />
+              <MiniStat
+                label="Sharpe ratio"
+                value={risk.sharpe.toFixed(2)}
+                tone={risk.sharpe >= 1 ? "pos" : undefined}
+                hint="Výnos nad bezrizikovou sazbou (3 %) na jednotku rizika. >1 dobré, <0,5 slabé."
+              />
             </div>
           )}
           {benchmark.length ? <BenchmarkChart data={benchmark} /> : <Empty msg="Benchmark se nepodařilo načíst." />}
@@ -217,6 +258,7 @@ export default function Page() {
           <Section
             title="Alokace portfolia"
             subtitle="Podle tržní hodnoty"
+            hint="Rozdělení tržní hodnoty pozic. Přepínej mezi jednotlivými tituly, sektory (data z Finnhubu) a měnami."
             action={
               <Toggle
                 value={allocMode}
@@ -248,9 +290,22 @@ export default function Page() {
       <div className="grid lg:grid-cols-2 gap-6 mt-6">
         <Section title="Dividendy v čase" subtitle="Přijaté dividendy po měsících od 1/2025, podle titulu (brutto, CZK)">
           <div className="grid grid-cols-3 gap-3 mb-4">
-            <MiniStat label="Příjem za 12 měsíců" value={czk(s.dividendTtmTotal)} tone="pos" />
-            <MiniStat label="Yield on cost" value={`${(s.dividendYieldOnCostPct ?? 0).toFixed(2)} %`} />
-            <MiniStat label="Dividendový výnos" value={`${(s.dividendForwardYieldPct ?? 0).toFixed(2)} %`} />
+            <MiniStat
+              label="Příjem za 12 měsíců"
+              value={czk(s.dividendTtmTotal)}
+              tone="pos"
+              hint="Skutečně přijaté dividendy (netto po srážkové dani) za posledních 12 měsíců."
+            />
+            <MiniStat
+              label="Yield on cost"
+              value={`${(s.dividendYieldOnCostPct ?? 0).toFixed(2)} %`}
+              hint="Roční dividendy / pořizovací cena. Výnos vůči tomu, cos za akcie zaplatila."
+            />
+            <MiniStat
+              label="Dividendový výnos"
+              value={`${(s.dividendForwardYieldPct ?? 0).toFixed(2)} %`}
+              hint="Roční dividendy / aktuální tržní hodnota portfolia."
+            />
           </div>
           {dividendRows.length ? (
             <DividendStackedChart data={dividendRows} tickers={s.dividendTickers} />
@@ -279,22 +334,28 @@ export default function Page() {
   );
 }
 
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "pos" | "neg" }) {
+function Kpi({ label, value, sub, tone, hint }: { label: string; value: string; sub?: string; tone?: "pos" | "neg"; hint?: string }) {
   const toneCls = tone === "pos" ? "text-pos" : tone === "neg" ? "text-neg" : "text-white";
   return (
     <div className="card p-4">
-      <div className="stat-label">{label}</div>
+      <div className="stat-label">
+        {label}
+        {hint && <InfoTip text={hint} />}
+      </div>
       <div className={`text-xl font-semibold mt-1 ${toneCls}`}>{value}</div>
       {sub && <div className="text-muted text-xs mt-1">{sub}</div>}
     </div>
   );
 }
 
-function MiniStat({ label, value, tone }: { label: string; value: string; tone?: "pos" | "neg" }) {
+function MiniStat({ label, value, tone, hint }: { label: string; value: string; tone?: "pos" | "neg"; hint?: string }) {
   const toneCls = tone === "pos" ? "text-pos" : tone === "neg" ? "text-neg" : "text-white";
   return (
     <div className="bg-panel2 rounded-xl p-3">
-      <div className="stat-label">{label}</div>
+      <div className="stat-label">
+        {label}
+        {hint && <InfoTip text={hint} />}
+      </div>
       <div className={`text-lg font-semibold mt-0.5 ${toneCls}`}>{value}</div>
     </div>
   );
@@ -304,18 +365,23 @@ function Section({
   title,
   subtitle,
   action,
+  hint,
   children,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
+  hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="card p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-semibold">{title}</h2>
+          <h2 className="text-base font-semibold">
+            {title}
+            {hint && <InfoTip text={hint} />}
+          </h2>
           {subtitle && <p className="text-muted text-xs mt-0.5">{subtitle}</p>}
         </div>
         {action}

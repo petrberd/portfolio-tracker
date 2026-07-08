@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { IncomeChart } from "@/components/Charts";
+import { InfoTip } from "@/components/InfoTip";
 import { czk } from "@/lib/format";
 
 const shortDate = (iso: string) =>
@@ -33,10 +34,10 @@ export function DividendCalendar() {
   return (
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <Stat label="Příjem / 12 měsíců" value={czk(d.annualIncomeCzk)} tone />
-        <Stat label="Průměrně měsíčně" value={czk(monthly)} />
-        <Stat label="z toho dividendy" value={czk(d.dividendCzk ?? 0)} />
-        <Stat label="z toho úroky (netto)" value={czk(d.interestCzk ?? 0)} />
+        <Stat label="Příjem / 12 měsíců" value={czk(d.annualIncomeCzk)} tone hint="Očekávaný příjem na příštích 12 měsíců: dividendy + úroky ze spořicích účtů." />
+        <Stat label="Průměrně měsíčně" value={czk(monthly)} hint="Roční projektovaný příjem dělený dvanácti." />
+        <Stat label="z toho dividendy" value={czk(d.dividendCzk ?? 0)} hint="Část projekce z dividend akcií (podle počtu kusů k ex-dni)." />
+        <Stat label="z toho úroky (netto)" value={czk(d.interestCzk ?? 0)} hint="Část projekce z úroků spořicích účtů, netto po 15% srážkové dani." />
       </div>
 
       <IncomeChart data={d.byMonth} />
@@ -76,10 +77,13 @@ export function DividendCalendar() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: boolean }) {
+function Stat({ label, value, tone, hint }: { label: string; value: string; tone?: boolean; hint?: string }) {
   return (
     <div className="bg-panel2 rounded-xl p-3">
-      <div className="stat-label">{label}</div>
+      <div className="stat-label">
+        {label}
+        {hint && <InfoTip text={hint} />}
+      </div>
       <div className={`text-lg font-semibold mt-0.5 ${tone ? "text-pos" : "text-white"}`}>{value}</div>
     </div>
   );

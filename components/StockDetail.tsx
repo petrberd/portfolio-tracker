@@ -11,6 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { InfoTip } from "@/components/InfoTip";
 
 const money = (v: number, ccy: string, d = 2) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy || "USD", maximumFractionDigits: d }).format(v ?? 0);
@@ -108,10 +109,15 @@ export function StockDetail({
           <>
             {/* Fundamentals strip */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-              <Metric label="Tržní kap." value={marketCap != null ? bigMoney(marketCap, ccy) : "—"} />
-              <Metric label="P/E" value={pe != null ? pe.toFixed(1) : "—"} />
-              <Metric label="Tržby (rok)" value={f?.revenue ? bigMoney(f.revenue, ccy) : "—"} sub={f?.revenueGrowth ? `růst ${(f.revenueGrowth * 100).toFixed(0)} %` : undefined} />
-              <Metric label="Čistá marže" value={netMargin != null ? `${netMargin.toFixed(1)} %` : "—"} />
+              <Metric label="Tržní kap." value={marketCap != null ? bigMoney(marketCap, ccy) : "—"} hint="Tržní kapitalizace = aktuální cena × počet akcií." />
+              <Metric label="P/E" value={pe != null ? pe.toFixed(1) : "—"} hint="Cena / zisk na akcii (EPS). Kolik platíš za 1 jednotku ročního zisku." />
+              <Metric
+                label="Tržby (rok)"
+                value={f?.revenue ? bigMoney(f.revenue, ccy) : "—"}
+                sub={f?.revenueGrowth ? `růst ${(f.revenueGrowth * 100).toFixed(0)} %` : undefined}
+                hint="Roční tržby (poslední fiskální rok). Růst = průměrný meziroční růst (CAGR) z dostupné historie."
+              />
+              <Metric label="Čistá marže" value={netMargin != null ? `${netMargin.toFixed(1)} %` : "—"} hint="Čistý zisk / tržby — kolik z každé koruny tržeb zůstane jako zisk." />
             </div>
 
             {/* Dividend schedule */}
@@ -244,10 +250,13 @@ export function StockDetail({
   );
 }
 
-function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Metric({ label, value, sub, hint }: { label: string; value: string; sub?: string; hint?: string }) {
   return (
     <div className="bg-panel2 rounded-xl p-3">
-      <div className="stat-label">{label}</div>
+      <div className="stat-label">
+        {label}
+        {hint && <InfoTip text={hint} />}
+      </div>
       <div className="text-lg font-semibold mt-0.5">{value}</div>
       {sub && <div className="text-muted text-xs">{sub}</div>}
     </div>
