@@ -42,6 +42,7 @@ export interface PortfolioSummary {
   totalFees: number;
   totalRealizedPnl: number;
   totalCostBasis: number;
+  xtbCash: number; // uninvested cash balance sitting in the XTB account (CZK)
   cashflowByMonth: CashflowPoint[];
   dividendByMonth: DividendMonthRow[]; // stacked-by-ticker gross dividends
   dividendTickers: DividendTicker[]; // top payers, for legend/keys
@@ -229,6 +230,8 @@ export function reconstructPortfolio(data: ParsedExport): PortfolioSummary {
   holdings.sort((a, b) => b.czkCostBasis - a.czkCostBasis);
 
   const totalRealizedPnl = [...realizedByTicker.values()].reduce((s, v) => s + v, 0);
+  // Uninvested cash in the XTB account = net of every signed cash operation.
+  const xtbCash = data.cashOps.reduce((s, o) => s + o.amount, 0);
   const cashflowByMonth = [...cashflow.values()].sort((a, b) => a.month.localeCompare(b.month));
 
   // Dividend breakdown: keep the top payers as their own stacked series and
@@ -272,6 +275,7 @@ export function reconstructPortfolio(data: ParsedExport): PortfolioSummary {
     totalFees,
     totalRealizedPnl,
     totalCostBasis,
+    xtbCash,
     cashflowByMonth,
     dividendByMonth,
     dividendTickers,

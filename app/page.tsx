@@ -155,8 +155,9 @@ export default function Page() {
         />
         <Kpi
           label="Tržní hodnota"
-          value={czk(s.totalMarketValue)}
-          hint="Aktuální hodnota držených akcií: počet kusů × živá cena × kurz do CZK."
+          value={czk(s.totalMarketValue + (s.xtbCash ?? 0))}
+          sub={`vč. volných ${czk(s.xtbCash ?? 0)}`}
+          hint="Celková hodnota XTB účtu: tržní hodnota držených akcií (kusy × živá cena × kurz) + volné nezainvestované prostředky na XTB."
         />
         <Kpi
           label="Nerealizovaný zisk"
