@@ -1,5 +1,4 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { readJson, writeJson } from "./storage";
 
 /**
  * Finnhub (free tier) — company profile (sector) and insider transactions.
@@ -8,7 +7,7 @@ import path from "path";
  */
 
 const KEY = process.env.FINNHUB_API_KEY ?? "";
-const CACHE_FILE = path.join(process.cwd(), "data", "finnhub.json");
+const CACHE_KEY = "finnhub.json";
 const PROFILE_TTL = 7 * 24 * 60 * 60 * 1000; // sector rarely changes
 const INSIDER_TTL = 12 * 60 * 60 * 1000;
 
@@ -32,21 +31,11 @@ let cache: Cache | null = null;
 
 async function loadCache(): Promise<Cache> {
   if (cache) return cache;
-  try {
-    cache = JSON.parse(await fs.readFile(CACHE_FILE, "utf8")) as Cache;
-  } catch {
-    cache = {};
-  }
+  cache = (await readJson<Cache>(CACHE_KEY)) ?? {};
   return cache;
 }
 async function saveCache(): Promise<void> {
-  if (!cache) return;
-  try {
-    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(cache), "utf8");
-  } catch (e) {
-    console.error("finnhub cache save failed", e);
-  }
+  if (cache) await writeJson(CACHE_KEY, cache);
 }
 
 async function cached<T>(key: string, ttl: number, fetcher: () => Promise<T | null>): Promise<T | null> {

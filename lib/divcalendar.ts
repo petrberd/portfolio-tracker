@@ -1,5 +1,4 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { readJson, writeJson } from "./storage";
 
 /**
  * Dividend schedule per symbol: payment frequency, amount per share, and the
@@ -8,7 +7,7 @@ import path from "path";
  * else (ex-dates are real, pay date is estimated from the ex→pay lag).
  */
 
-const CACHE_FILE = path.join(process.cwd(), "data", "divcal.json");
+const CACHE_KEY = "divcal.json";
 const TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface DivMeta {
@@ -27,21 +26,11 @@ let cache: Cache | null = null;
 
 async function loadCache(): Promise<Cache> {
   if (cache) return cache;
-  try {
-    cache = JSON.parse(await fs.readFile(CACHE_FILE, "utf8")) as Cache;
-  } catch {
-    cache = {};
-  }
+  cache = (await readJson<Cache>(CACHE_KEY)) ?? {};
   return cache;
 }
 async function saveCache(): Promise<void> {
-  if (!cache) return;
-  try {
-    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(cache), "utf8");
-  } catch (e) {
-    console.error("divcal cache save failed", e);
-  }
+  if (cache) await writeJson(CACHE_KEY, cache);
 }
 
 const DAY = 86400000;

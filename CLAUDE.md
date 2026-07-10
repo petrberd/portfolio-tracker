@@ -58,9 +58,21 @@ Zjištěno empiricky (prostředí blokuje část zdrojů):
 - **Známé zjednodušení:** historické hodnoty se přepočítávají DNEŠNÍM FX kurzem (ne historickým) — zkresluje
   to historické CZK hodnoty a míchá cenový vs měnový efekt. Kandidát na opravu (historický FX / přepínač CZK/USD).
 
-## Cache & data
-`data/*.json` (gitignored): `export.json` (import), `prices.json`, `fundamentals.json`, `finnhub.json`,
-`analysts.json`, `divcal.json`. Smazáním souboru se vynutí re-fetch. Tlačítko „Obnovit ceny" obchází cache cen.
+## Cache & data / persistence
+Perzistence jde přes `lib/storage.ts` (`readJson`/`writeJson`): **lokálně soubory v `data/`**,
+**na Netlify Netlify Blobs** (read-only FS) — přepíná se podle `process.env.NETLIFY`. Klíče:
+`export.json` (import), `prices.json`, `fundamentals.json`, `finnhub.json`, `analysts.json`,
+`divcal.json`, `cash.json`. Lokálně smazáním souboru vynutíš re-fetch; „Obnovit ceny" obchází cache cen.
+Když přidáváš nový cache modul, čti/zapisuj přes `storage.ts`, ne přes `fs` napřímo (jinak spadne na Netlify).
+
+## Basic auth
+`middleware.ts` schová celý web za HTTP Basic Auth, když jsou nastavené `BASIC_AUTH_USER` +
+`BASIC_AUTH_PASSWORD` (jinak je web otevřený). Creds nejsou v repu — lokálně `.env.local`, na Netlify env.
+
+## Netlify deploy
+`netlify.toml` + `@netlify/plugin-nextjs`. Env proměnné na Netlify: `BASIC_AUTH_*`, `FINNHUB_API_KEY`,
+volitelně `CASH_CONFIG_JSON` (spořicí účty jako JSON, protože `data/cash.json` se nedeployuje).
+XTB export se na živém webu nahraje ručně (uloží se do Blobs). Build ověříš `npm run build`.
 
 ## Nápady na pokračování (z PM review, neimplementováno)
 1. **Panel koncentrace/rizika** — TOP1/3/5 váhy, HHI, sektorová koncentrace + flagy (portfolio je hodně

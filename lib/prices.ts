@@ -1,14 +1,13 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { readJson, writeJson } from "./storage";
 
 /**
  * Price data straight from Yahoo's public chart JSON endpoint on query1
  * (no crumb/cookie needed, unlike query2 which rate-limits). A single call per
  * symbol yields the trading currency, the latest price, the previous close and
- * the full daily close history. Results are cached to disk with a short TTL.
+ * the full daily close history. Results are cached with a short TTL.
  */
 
-const CACHE_FILE = path.join(process.cwd(), "data", "prices.json");
+const CACHE_KEY = "prices.json";
 const TTL_MS = 60 * 60 * 1000; // 1h auto-refresh; the "Obnovit ceny" button forces fresh
 
 export interface DailyClose {
@@ -29,22 +28,12 @@ let cache: Cache | null = null;
 
 async function loadCache(): Promise<Cache> {
   if (cache) return cache;
-  try {
-    cache = JSON.parse(await fs.readFile(CACHE_FILE, "utf8")) as Cache;
-  } catch {
-    cache = {};
-  }
+  cache = (await readJson<Cache>(CACHE_KEY)) ?? {};
   return cache;
 }
 
 async function saveCache(): Promise<void> {
-  if (!cache) return;
-  try {
-    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(cache), "utf8");
-  } catch (e) {
-    console.error("price cache save failed", e);
-  }
+  if (cache) await writeJson(CACHE_KEY, cache);
 }
 
 /** Map an XTB ticker (e.g. "MU.US") to a Yahoo Finance symbol. */

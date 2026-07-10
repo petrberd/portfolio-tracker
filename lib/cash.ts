@@ -1,10 +1,10 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { readJson } from "./storage";
 
 /**
- * External cash held outside XTB (savings accounts). Personal config stored in
- * `data/cash.json` (gitignored — not shared). Drives the "free cash" KPI and
- * the interest income added to the income projection.
+ * External cash held outside XTB (savings accounts). Config from `data/cash.json`
+ * locally (gitignored — not shared) or the CASH_CONFIG_JSON env var (handy on
+ * Netlify, where there is no local file). Drives the "free cash" KPI and the
+ * interest income added to the income projection.
  */
 
 export interface CashAccount {
@@ -17,15 +17,20 @@ export interface CashConfig {
   interestTaxPct: number; // withholding tax on interest, %
 }
 
-const FILE = path.join(process.cwd(), "data", "cash.json");
+const normalize = (cfg: Partial<CashConfig> | null): CashConfig => ({
+  accounts: cfg?.accounts ?? [],
+  interestTaxPct: cfg?.interestTaxPct ?? 15,
+});
 
 export async function loadCash(): Promise<CashConfig> {
-  try {
-    const cfg = JSON.parse(await fs.readFile(FILE, "utf8")) as CashConfig;
-    return { accounts: cfg.accounts ?? [], interestTaxPct: cfg.interestTaxPct ?? 15 };
-  } catch {
-    return { accounts: [], interestTaxPct: 15 };
+  if (process.env.CASH_CONFIG_JSON) {
+    try {
+      return normalize(JSON.parse(process.env.CASH_CONFIG_JSON) as CashConfig);
+    } catch (e) {
+      console.error("CASH_CONFIG_JSON parse failed", e);
+    }
   }
+  return normalize(await readJson<CashConfig>("cash.json"));
 }
 
 export const freeCashTotal = (cfg: CashConfig): number => cfg.accounts.reduce((s, a) => s + (a.balance || 0), 0);

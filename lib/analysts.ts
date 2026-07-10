@@ -1,5 +1,4 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { readJson, writeJson } from "./storage";
 
 /**
  * Analyst price targets and rating breakdown from stockanalysis.com's public
@@ -7,7 +6,7 @@ import path from "path";
  * crumb-blocked). Covers US-listed tickers by plain symbol (AAPL, NVDA, …).
  */
 
-const CACHE_FILE = path.join(process.cwd(), "data", "analysts.json");
+const CACHE_KEY = "analysts.json";
 const TTL_MS = 12 * 60 * 60 * 1000; // ratings move slowly
 
 export interface AnalystBreakdown {
@@ -31,21 +30,11 @@ let cache: Cache | null = null;
 
 async function loadCache(): Promise<Cache> {
   if (cache) return cache;
-  try {
-    cache = JSON.parse(await fs.readFile(CACHE_FILE, "utf8")) as Cache;
-  } catch {
-    cache = {};
-  }
+  cache = (await readJson<Cache>(CACHE_KEY)) ?? {};
   return cache;
 }
 async function saveCache(): Promise<void> {
-  if (!cache) return;
-  try {
-    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(cache), "utf8");
-  } catch (e) {
-    console.error("analysts cache save failed", e);
-  }
+  if (cache) await writeJson(CACHE_KEY, cache);
 }
 
 const parseMoney = (s: unknown): number => {

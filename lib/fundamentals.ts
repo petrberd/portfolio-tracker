@@ -1,5 +1,4 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { readJson, writeJson } from "./storage";
 
 /**
  * Company fundamentals from Yahoo's public `fundamentals-timeseries` endpoint
@@ -7,7 +6,7 @@ import path from "path";
  * metrics strip in the stock detail view.
  */
 
-const CACHE_FILE = path.join(process.cwd(), "data", "fundamentals.json");
+const CACHE_KEY = "fundamentals.json";
 const TTL_MS = 24 * 60 * 60 * 1000;
 
 const TYPES = [
@@ -36,21 +35,11 @@ let cache: Cache | null = null;
 
 async function loadCache(): Promise<Cache> {
   if (cache) return cache;
-  try {
-    cache = JSON.parse(await fs.readFile(CACHE_FILE, "utf8")) as Cache;
-  } catch {
-    cache = {};
-  }
+  cache = (await readJson<Cache>(CACHE_KEY)) ?? {};
   return cache;
 }
 async function saveCache(): Promise<void> {
-  if (!cache) return;
-  try {
-    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(cache), "utf8");
-  } catch (e) {
-    console.error("fundamentals cache save failed", e);
-  }
+  if (cache) await writeJson(CACHE_KEY, cache);
 }
 
 function cagr(series: number[]): number {
