@@ -252,13 +252,13 @@ export function StockDetail({
 
 function Metric({ label, value, sub, hint }: { label: string; value: string; sub?: string; hint?: string }) {
   return (
-    <div className="bg-panel2 rounded-xl p-3">
+    <div className="bg-panel2 rounded-xl p-3 min-w-0">
       <div className="stat-label">
         {label}
         {hint && <InfoTip text={hint} />}
       </div>
-      <div className="text-lg font-semibold mt-0.5">{value}</div>
-      {sub && <div className="text-muted text-xs">{sub}</div>}
+      <div className="text-lg font-semibold mt-0.5 truncate">{value}</div>
+      {sub && <div className="text-muted text-xs truncate">{sub}</div>}
     </div>
   );
 }

@@ -6,6 +6,13 @@ html,
 body {
   background: #0b0f19;
   color: #e6ebf5;
+  /* Belt-and-suspenders: the page must never scroll horizontally. Any stray
+     overflow (e.g. an absolutely-positioned tooltip near a screen edge) would
+     otherwise let mobile Safari's rubber-band gesture drag the whole page
+     sideways when you swipe across a chart, then snap back on release. */
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 * {

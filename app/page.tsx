@@ -253,8 +253,8 @@ export default function Page() {
       </div>
 
       {/* Allocation + holdings */}
-      <div className="grid lg:grid-cols-5 gap-6 mt-6">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+        <div className="lg:col-span-2 min-w-0">
           <Section
             title="Alokace portfolia"
             subtitle="Podle tržní hodnoty"
@@ -274,7 +274,7 @@ export default function Page() {
             {alloc.length ? <AllocationPie data={alloc} /> : <Empty msg="Žádné otevřené pozice." />}
           </Section>
         </div>
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 min-w-0">
           <Section title="Pozice" subtitle="Klikni na titul pro detail, graf s tvými obchody a novinky">
             <HoldingsTable holdings={holdings} total={s.totalMarketValue} onSelect={setDetail} />
           </Section>
@@ -287,9 +287,9 @@ export default function Page() {
       </div>
 
       {/* Dividends + deposits */}
-      <div className="grid lg:grid-cols-2 gap-6 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <Section title="Dividendy v čase" subtitle="Přijaté dividendy po měsících od 1/2025, podle titulu (brutto, CZK)">
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <MiniStat
               label="Příjem za 12 měsíců"
               value={czk(s.dividendTtmTotal)}
@@ -337,13 +337,13 @@ export default function Page() {
 function Kpi({ label, value, sub, tone, hint }: { label: string; value: string; sub?: string; tone?: "pos" | "neg"; hint?: string }) {
   const toneCls = tone === "pos" ? "text-pos" : tone === "neg" ? "text-neg" : "text-white";
   return (
-    <div className="card p-4">
+    <div className="card p-4 min-w-0">
       <div className="stat-label">
         {label}
         {hint && <InfoTip text={hint} />}
       </div>
-      <div className={`text-xl font-semibold mt-1 ${toneCls}`}>{value}</div>
-      {sub && <div className="text-muted text-xs mt-1">{sub}</div>}
+      <div className={`text-xl font-semibold mt-1 ${toneCls} truncate`}>{value}</div>
+      {sub && <div className="text-muted text-xs mt-1 truncate">{sub}</div>}
     </div>
   );
 }
@@ -351,12 +351,12 @@ function Kpi({ label, value, sub, tone, hint }: { label: string; value: string; 
 function MiniStat({ label, value, tone, hint }: { label: string; value: string; tone?: "pos" | "neg"; hint?: string }) {
   const toneCls = tone === "pos" ? "text-pos" : tone === "neg" ? "text-neg" : "text-white";
   return (
-    <div className="bg-panel2 rounded-xl p-3">
+    <div className="bg-panel2 rounded-xl p-3 min-w-0">
       <div className="stat-label">
         {label}
         {hint && <InfoTip text={hint} />}
       </div>
-      <div className={`text-lg font-semibold mt-0.5 ${toneCls}`}>{value}</div>
+      <div className={`text-lg font-semibold mt-0.5 ${toneCls} truncate`}>{value}</div>
     </div>
   );
 }
@@ -375,7 +375,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="card p-5">
+    <div className="card p-5 min-w-0">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold">
@@ -432,11 +432,11 @@ function HoldingsTable({
         <thead>
           <tr className="text-muted text-xs uppercase tracking-wide border-b border-line">
             <th className="text-left font-medium py-2">Titul</th>
-            <th className="text-right font-medium py-2">Kusů</th>
-            <th className="text-right font-medium py-2">Cena</th>
+            <th className="hidden sm:table-cell text-right font-medium py-2">Kusů</th>
+            <th className="hidden sm:table-cell text-right font-medium py-2">Cena</th>
             <th className="text-right font-medium py-2">Hodnota</th>
             <th className="text-right font-medium py-2">Zisk</th>
-            <th className="text-right font-medium py-2">Podíl</th>
+            <th className="hidden sm:table-cell text-right font-medium py-2">Podíl</th>
           </tr>
         </thead>
         <tbody>
@@ -455,8 +455,8 @@ function HoldingsTable({
                   </div>
                 </div>
               </td>
-              <td className="text-right tabular-nums">{num(h.shares, 4)}</td>
-              <td className="text-right tabular-nums">
+              <td className="hidden sm:table-cell text-right tabular-nums">{num(h.shares, 4)}</td>
+              <td className="hidden sm:table-cell text-right tabular-nums">
                 {h.livePrice ? `${num(h.livePrice)} ${h.currency}` : "—"}
                 {h.dayChangePercent ? (
                   <div className={`text-xs ${h.dayChangePercent >= 0 ? "text-pos" : "text-neg"}`}>{pct(h.dayChangePercent)}</div>
@@ -467,7 +467,7 @@ function HoldingsTable({
                 <div>{czk(h.unrealizedPnlCzk)}</div>
                 <div className="text-xs">{pct(h.unrealizedPnlPct)}</div>
               </td>
-              <td className="text-right tabular-nums text-muted">
+              <td className="hidden sm:table-cell text-right tabular-nums text-muted">
                 {total > 0 ? `${((h.marketValueCzk / total) * 100).toFixed(1)} %` : "—"}
               </td>
             </tr>

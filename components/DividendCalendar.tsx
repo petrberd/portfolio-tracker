@@ -79,12 +79,12 @@ export function DividendCalendar() {
 
 function Stat({ label, value, tone, hint }: { label: string; value: string; tone?: boolean; hint?: string }) {
   return (
-    <div className="bg-panel2 rounded-xl p-3">
+    <div className="bg-panel2 rounded-xl p-3 min-w-0">
       <div className="stat-label">
         {label}
         {hint && <InfoTip text={hint} />}
       </div>
-      <div className={`text-lg font-semibold mt-0.5 ${tone ? "text-pos" : "text-white"}`}>{value}</div>
+      <div className={`text-lg font-semibold mt-0.5 ${tone ? "text-pos" : "text-white"} truncate`}>{value}</div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ export function InfoTip({ text }: { text: string }) {
       </span>
       <span
         role="tooltip"
-        className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-max max-w-[230px] px-2.5 py-1.5 rounded-lg bg-panel2 border border-line text-[11px] font-normal normal-case tracking-normal leading-snug text-white/90 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 shadow-xl"
+        className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-max max-w-[180px] sm:max-w-[230px] px-2.5 py-1.5 rounded-lg bg-panel2 border border-line text-[11px] font-normal normal-case tracking-normal leading-snug text-white/90 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 shadow-xl"
       >
         {text}
       </span>

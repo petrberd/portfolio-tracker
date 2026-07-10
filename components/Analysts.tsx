@@ -96,9 +96,9 @@ export function AnalystPanel({ holdings }: { holdings: Holding[] }) {
       )}
 
       {!loading && a && (
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Price target */}
-          <div>
+          <div className="min-w-0">
             <div className="stat-label">
               Cílová cena (12 měsíců)
               <InfoTip text="Průměrná 12měsíční cílová cena analytiků. Potenciál = rozdíl vůči aktuální ceně." />
@@ -116,7 +116,7 @@ export function AnalystPanel({ holdings }: { holdings: Holding[] }) {
           </div>
 
           {/* Rating breakdown */}
-          <div className="space-y-2">
+          <div className="space-y-2 min-w-0">
             {ROWS.map((r) => {
               const n = a.breakdown[r.key] as number;
               return (
