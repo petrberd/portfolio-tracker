@@ -233,10 +233,13 @@ export function computeRiskMetrics(series: ValuePoint[]): RiskMetrics | null {
     maxDrawdown = Math.min(maxDrawdown, (idx - peak) / peak);
   }
   const years = r.length / 252;
-  const annualizedReturn = years > 0 ? Math.pow(idx, 1 / years) - 1 : 0;
+  // Guard Math.pow against a non-positive cumulative index (would yield NaN).
+  const annualizedReturn = years > 0 && idx > 0 ? Math.pow(idx, 1 / years) - 1 : 0;
   const rf = 0.03; // assumed risk-free rate
   const sharpe = volatility > 0 ? (annualizedReturn - rf) / volatility : 0;
-  return { volatility, maxDrawdown, sharpe, annualizedReturn };
+  // Never emit NaN/Infinity — JSON serializes those to null and crashes the UI.
+  const fin = (x: number) => (Number.isFinite(x) ? x : 0);
+  return { volatility: fin(volatility), maxDrawdown: fin(maxDrawdown), sharpe: fin(sharpe), annualizedReturn: fin(annualizedReturn) };
 }
 
 export interface BenchmarkPoint {

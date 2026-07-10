@@ -225,25 +225,25 @@ export default function Page() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <MiniStat
                 label="Roční výnos (p.a.)"
-                value={pct(risk.annualizedReturn * 100)}
-                tone={risk.annualizedReturn >= 0 ? "pos" : "neg"}
+                value={pct((risk.annualizedReturn ?? 0) * 100)}
+                tone={(risk.annualizedReturn ?? 0) >= 0 ? "pos" : "neg"}
                 hint="Anualizovaný time-weighted výnos portfolia (nezávislý na načasování a velikosti vkladů)."
               />
               <MiniStat
                 label="Volatilita (p.a.)"
-                value={`${(risk.volatility * 100).toFixed(1)} %`}
+                value={`${((risk.volatility ?? 0) * 100).toFixed(1)} %`}
                 hint="Kolísavost denních výnosů, anualizovaná (směr. odchylka × √252). Vyšší = rizikovější."
               />
               <MiniStat
                 label="Max. pokles"
-                value={`${(risk.maxDrawdown * 100).toFixed(1)} %`}
+                value={`${((risk.maxDrawdown ?? 0) * 100).toFixed(1)} %`}
                 tone="neg"
                 hint="Největší propad z vrcholu na následné dno (max drawdown) za sledované období."
               />
               <MiniStat
                 label="Sharpe ratio"
-                value={risk.sharpe.toFixed(2)}
-                tone={risk.sharpe >= 1 ? "pos" : undefined}
+                value={(risk.sharpe ?? 0).toFixed(2)}
+                tone={(risk.sharpe ?? 0) >= 1 ? "pos" : undefined}
                 hint="Výnos nad bezrizikovou sazbou (3 %) na jednotku rizika. >1 dobré, <0,5 slabé."
               />
             </div>
