@@ -32,6 +32,7 @@ export interface ClosedPosition {
   purchaseValue: number; // CZK
   saleValue: number; // CZK
   positionId: string;
+  comment: string;
 }
 
 export interface ParsedExport {
@@ -138,6 +139,7 @@ export function parseXtbWorkbook(buffer: ArrayBuffer | Buffer): ParsedExport {
         purchaseValue: num(r?.[12]),
         saleValue: num(r?.[13]),
         positionId: String(r?.[23] ?? ""),
+        comment: String(r?.[24] ?? "").trim(),
       });
     }
   }

@@ -1,5 +1,8 @@
 import type { CashOp, ParsedExport } from "./parseXtb";
 import { yahooSymbol } from "./prices";
+import { getExternalDisposals } from "./transfers";
+
+const DISPOSAL_OP_TYPE = "External disposal";
 
 export interface Lot {
   shares: number;
@@ -64,7 +67,20 @@ const BUY_TYPES = new Set(["Stock purchase"]);
  * oldest lots first. Remaining lots = the portfolio held today.
  */
 export function reconstructPortfolio(data: ParsedExport): PortfolioSummary {
-  const ops = [...data.cashOps]
+  // Shares that left the account outside of Cash Operations (e.g. gifted away)
+  // — merged in as pseudo-ops so FIFO consumes the right lots at the right time.
+  const disposalOps: CashOp[] = getExternalDisposals(data).map((d) => ({
+    type: DISPOSAL_OP_TYPE,
+    ticker: d.ticker,
+    instrument: "",
+    time: d.date,
+    amount: 0,
+    id: "",
+    comment: "Externí odchod akcií (např. dar) mimo Cash Operations",
+    volume: d.volume,
+  }));
+
+  const ops = [...data.cashOps, ...disposalOps]
     .filter((o) => o.time)
     .sort((a, b) => a.time.localeCompare(b.time)); // oldest first for FIFO
 
@@ -131,6 +147,23 @@ export function reconstructPortfolio(data: ParsedExport): PortfolioSummary {
         const proceeds = op.amount; // positive inflow
         const realized = proceeds - costRemoved;
         realizedByTicker.set(op.ticker, (realizedByTicker.get(op.ticker) ?? 0) + realized);
+        break;
+      }
+      case DISPOSAL_OP_TYPE: {
+        // Shares left the account with no proceeds (e.g. gifted) — remove them
+        // from the FIFO lots, but don't touch realized P/L or cash: it's not a sale.
+        if (!op.ticker || !op.volume) break;
+        const lots = lotsByTicker.get(op.ticker) ?? [];
+        let toRemove = op.volume;
+        while (toRemove > 1e-9 && lots.length) {
+          const lot = lots[0];
+          const take = Math.min(lot.shares, toRemove);
+          const frac = take / lot.shares;
+          lot.czkCost -= lot.czkCost * frac;
+          lot.shares -= take;
+          toRemove -= take;
+          if (lot.shares <= 1e-9) lots.shift();
+        }
         break;
       }
       case "Deposit":

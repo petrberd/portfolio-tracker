@@ -1,5 +1,6 @@
 import type { ParsedExport } from "./parseXtb";
 import { yahooSymbol, fetchChart, fetchFxCzk, fetchDailyCloses } from "./prices";
+import { getExternalDisposals } from "./transfers";
 
 export interface ValuePoint {
   date: string; // YYYY-MM-DD
@@ -39,6 +40,13 @@ export async function buildValueSeries(data: ParsedExport, force = false): Promi
       trades.push({ date: op.time.slice(0, 10), ticker: op.ticker, volume: op.volume, sell: true });
       tickers.add(op.ticker);
     }
+  }
+
+  // Shares that left outside Cash Operations (e.g. gifted away) — same effect
+  // on the held-shares count as a sell, but tracked separately from cash ops.
+  for (const d of getExternalDisposals(data)) {
+    trades.push({ date: d.date.slice(0, 10), ticker: d.ticker, volume: d.volume, sell: true });
+    tickers.add(d.ticker);
   }
 
   // 2. Chart (history + currency) per ticker, fetched in parallel.

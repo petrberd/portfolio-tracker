@@ -4,6 +4,7 @@ import { reconstructPortfolio } from "@/lib/positions";
 import { fetchChart, fetchFxCzk } from "@/lib/prices";
 import { fetchDividendMeta, projectPayments } from "@/lib/divcalendar";
 import { loadCash, monthlyNetInterest } from "@/lib/cash";
+import { getExternalDisposals } from "@/lib/transfers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,12 +45,16 @@ export async function GET(req: NextRequest) {
 
   // Shares held as of a given date (dividend eligibility is set at the ex-date,
   // not today — shares bought after the ex-date don't earn that payment).
+  const disposals = getExternalDisposals(stored);
   const sharesAsOf = (ticker: string, cutoffIso: string): number => {
     let s = 0;
     for (const o of stored.cashOps) {
       if (o.ticker !== ticker || !o.time || o.time.slice(0, 10) > cutoffIso) continue;
       if (o.type === "Stock purchase") s += o.volume ?? 0;
       else if (o.type === "Stock sell") s -= o.volume ?? 0;
+    }
+    for (const d of disposals) {
+      if (d.ticker === ticker && d.date.slice(0, 10) <= cutoffIso) s -= d.volume;
     }
     return s;
   };
