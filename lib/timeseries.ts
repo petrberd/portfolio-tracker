@@ -21,7 +21,10 @@ interface TradeEvent {
 /**
  * Build a daily time series of portfolio market value (CZK) vs. net invested
  * capital. Combines the transaction-derived daily share counts per ticker with
- * historical daily closes from Yahoo and a (current) FX rate per currency.
+ * historical closes from Yahoo — for both the stock price AND the FX rate, so
+ * a 2024 point is valued at the 2024 FX rate, not today's. (Previously a
+ * single current FX rate was applied to the entire history, which mixed the
+ * currency's own drift into the portfolio's price performance.)
  */
 export async function buildValueSeries(data: ParsedExport, force = false): Promise<ValuePoint[]> {
   const ops = [...data.cashOps].filter((o) => o.time).sort((a, b) => a.time.localeCompare(b.time));
@@ -50,19 +53,34 @@ export async function buildValueSeries(data: ParsedExport, force = false): Promi
   }
 
   // 2. Chart (history + currency) per ticker, fetched in parallel.
-  const rateByTicker = new Map<string, number>();
+  const currencyByTicker = new Map<string, string>();
   const chartResults = await Promise.all(
     [...tickers].map(async (t) => ({ ticker: t, chart: await fetchChart(yahooSymbol(t), force) }))
   );
 
-  // Convert each ticker's native price to CZK with a (current) FX rate.
+  // Historical FX rate per currency (same monthly-ish cadence as the stock
+  // charts below — Yahoo's range=max — so both series line up day-for-day).
+  // A fallback current rate covers any day before that currency's earliest
+  // known FX point (in practice never hit — USDCZK=X history goes back to 2003).
   const currencies = [...new Set(chartResults.map((r) => r.chart?.currency ?? "USD"))];
   const fxByCcy = new Map<string, number>();
   await Promise.all(currencies.map(async (c) => fxByCcy.set(c, await fetchFxCzk(c, force))));
+  const fxChartByCcy = new Map<string, Awaited<ReturnType<typeof fetchChart>>>();
+  await Promise.all(
+    currencies.map(async (c) => fxChartByCcy.set(c, c === "CZK" ? null : await fetchChart(`${c}CZK=X`, force)))
+  );
+  const fxHistByCcy = new Map<string, Map<string, number>>();
+  for (const c of currencies) {
+    const m = new Map<string, number>();
+    for (const h of fxChartByCcy.get(c)?.closes ?? []) {
+      if (h.date >= startDate) m.set(h.date, h.close);
+    }
+    fxHistByCcy.set(c, m);
+  }
 
   const histByTicker = new Map<string, Map<string, number>>();
   for (const { ticker, chart } of chartResults) {
-    rateByTicker.set(ticker, fxByCcy.get(chart?.currency ?? "USD") ?? 21);
+    currencyByTicker.set(ticker, chart?.currency ?? "USD");
     const m = new Map<string, number>();
     for (const h of chart?.closes ?? []) {
       if (h.date >= startDate) m.set(h.date, h.close);
@@ -91,6 +109,7 @@ export async function buildValueSeries(data: ParsedExport, force = false): Promi
   type Lot = { shares: number; czkCost: number };
   const lotsByTicker = new Map<string, Lot[]>();
   const lastClose = new Map<string, number>();
+  const lastFx = new Map<string, number>();
   const tradesByDay = new Map<string, TradeEvent[]>();
   for (const t of trades) {
     const arr = tradesByDay.get(t.date) ?? [];
@@ -133,7 +152,13 @@ export async function buildValueSeries(data: ParsedExport, force = false): Promi
       const close = hist?.get(day);
       if (close != null) lastClose.set(ticker, close);
       const px = lastClose.get(ticker);
-      if (px != null) stockValue += sh * px * (rateByTicker.get(ticker) ?? 23);
+
+      const ccy = currencyByTicker.get(ticker) ?? "USD";
+      const fxClose = fxHistByCcy.get(ccy)?.get(day);
+      if (fxClose != null) lastFx.set(ccy, fxClose);
+      const rate = ccy === "CZK" ? 1 : lastFx.get(ccy) ?? fxByCcy.get(ccy) ?? 21;
+
+      if (px != null) stockValue += sh * px * rate;
     }
     const value = stockValue + cash;
     if (value !== 0 || invested !== 0) series.push({ date: day, value, market: stockValue, costBasis, invested });
