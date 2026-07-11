@@ -91,19 +91,21 @@ reálné riziko je zanedbatelné.
 - **Výkonnost vs. trh** — portfolio (TWR) vs. **S&P 500 Total Return** (`^SP500TR`, vč.
   reinvestovaných dividend — fér srovnání proti portfoliu, které dividendy taky počítá do
   výkonnosti) + rizikové metriky (roční výnos, volatilita, max. pokles, Sharpe ratio).
-- **Nálada trhu** — VIX (index očekávané volatility S&P 500, „index strachu") s gaugem
-  a klasifikací klid/nervozita/strach/panika.
+- **Nálada trhu** — VIX (index očekávané volatility S&P 500, „index strachu") — aktuální
+  hodnota s gaugem a klasifikací klid/nervozita/strach/panika, plus graf historie
+  (~6 měsíců, denní data) s referenčními čarami na úrovních 20/30.
 
-### Titul v detailu
+### Analýza a výhled
 - **Analytické odhady** — rozpad doporučení (silný nákup … silný prodej) + gauge „Férová
   cena" (odhad analytiků vs. aktuální cena, barevná škála podhodnoceno → nadhodnoceno).
   Data z stockanalysis.com. Ne investiční doporučení.
 - **Detail titulu** — klik na pozici otevře modal: 2letý cenový graf s tvými nákupy/prodeji,
   klíčové fundamenty (tržní kap., P/E, tržby, marže), analytici, **insider obchody** (Finnhub)
   a **newsfeed** (Yahoo RSS).
-- **Earnings kalendář** — nejbližší termín výsledků pro každý titul v portfoliu
-  (stockanalysis.com); pokud je poslední známé datum už v minulosti, appka ho odhadne
-  o ~91 dní dopředu (typická čtvrtletní kadence) a označí „(odhad)".
+- **Earnings kalendář** — kompaktní box (pod Alokací portfolia) s nejbližším termínem
+  výsledků pro každý titul v portfoliu (stockanalysis.com); pokud je poslední známé datum
+  už v minulosti, appka ho odhadne o ~91 dní dopředu (typická čtvrtletní kadence) a označí
+  „(odhad)".
 - **Dividendová projekce** — očekávaný příjem na 12 měsíců z aktuálních pozic (podle počtu
   kusů k ex-dni, ne dnešního), rozpad po titulech/účtech, a kalendář ex-dividend/výplat.
   Ex/pay date z Nasdaqu (reálné, jen Nasdaq-listed) → fallback stockanalysis.com (taky reálné
@@ -112,15 +114,6 @@ reálné riziko je zanedbatelné.
   kusů je už přes 3 roky osvobozeno a kdy se osvobodí další tranše; plus roční hodnotový
   limit 100 000 Kč (hrubý příjem z prodeje CP za kalendářní rok). Orientační výpočet, ne
   daňové poradenství.
-
-### Smart Money
-- **Sleduj obchody super investorů a insiderů** — 13F filings (Warren Buffett/Berkshire,
-  Bill Ackman/Pershing Square, Michael Burry/Scion) diffnuté mezi posledními dvěma čtvrtletími
-  (nové/navýšené/snížené/uzavřené pozice) + Form 4 insider obchody (Jensen Huang, Elon Musk,
-  Mark Zuckerberg) — jen skutečné nákupy/prodeje na volném trhu, ne granty/daňové odvody.
-  Vše zdarma přes SEC EDGAR. 13F má zpoždění až 45 dní a chybí bezplatné CUSIP→ticker
-  mapování (pozice se zobrazují podle názvu firmy). Politici (STOCK Act) vynechání — bezplatné
-  zdroje jsou nedostupné a oficiální portály nemají REST API.
 
 Insider obchody a sektory (v detailu titulu) vyžadují **Finnhub API klíč** v `.env.local`
 (`FINNHUB_API_KEY`); free tier stačí. Institucionální držba a cílové ceny (Finnhub) jsou jen
@@ -149,9 +142,6 @@ uzavřenému dennímu close.
   s fallback řetězcem Nasdaq → stockanalysis.com → Yahoo (viz výše).
 - **Earnings** (`lib/earnings.ts`) a **analytici** (`lib/analysts.ts`) — stockanalysis.com,
   SvelteKit „devalue" formát (`__data.json`), stejný parsing pattern v obou modulech.
-- **Smart Money** (`lib/thirteenF.ts`, `lib/secInsiders.ts`, `lib/secEdgar.ts`) — SEC EDGAR
-  (`data.sec.gov` + `www.sec.gov/Archives`), XML parsováno přes `fast-xml-parser`. Vyžaduje
-  identifikující `User-Agent` hlavičku (SEC blokuje anonymní boty), viz `lib/secEdgar.ts`.
 
 ## Data
 
@@ -159,12 +149,12 @@ Lokálně v `data/` (gitignored), na Netlify přes Netlify Blobs (`lib/storage.t
 
 - `export.json` — poslední naimportovaný export.
 - `prices.json`, `fundamentals.json`, `analysts.json`, `finnhub.json`, `divcal.json`,
-  `earnings.json`, `13f.json`, `insiders.json` — cache jednotlivých datových zdrojů
-  (smaž pro vynucené stažení; TTL se liší modul od modulu, viz komentáře v `lib/`).
+  `earnings.json` — cache jednotlivých datových zdrojů (smaž pro vynucené stažení; TTL se
+  liší modul od modulu, viz komentáře v `lib/`).
 - `cash.json` — externí spořicí účty (volitelné, `.env.example`/README výše).
 
 Vše zůstává lokálně, nic se nikam neposílá. Jen pro osobní přehled — není to investiční poradenství.
 
 ## Technologie
 
-Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · fast-xml-parser · Tailwind CSS.
+Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind CSS.
