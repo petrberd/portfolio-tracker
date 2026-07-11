@@ -20,6 +20,7 @@ export interface Holding {
   avgNativePrice: number; // weighted avg buy price in native ccy
   realizedPnlCzk: number; // realized P/L from sells of this ticker (CZK)
   dividendsCzk: number; // net dividends received (CZK, gross - WHT)
+  lots: { shares: number; time: string }[]; // remaining FIFO lots (purchase date + shares) — for the tax time test
 }
 
 export interface CashflowPoint {
@@ -48,6 +49,7 @@ export interface PortfolioSummary {
   dividendTickers: DividendTicker[]; // top payers, for legend/keys
   firstOpDate: string;
   lastOpDate: string;
+  taxYearSoldCzk: number; // gross proceeds from stock sells in the current calendar year (CZK)
 }
 
 export interface DividendTicker {
@@ -99,6 +101,8 @@ export function reconstructPortfolio(data: ParsedExport): PortfolioSummary {
   let totalWithholdingTax = 0;
   let totalInterest = 0;
   let totalFees = 0;
+  let taxYearSoldCzk = 0;
+  const currentYear = new Date().getUTCFullYear().toString();
 
   const cashflow = new Map<string, CashflowPoint>();
   const monthKey = (iso: string) => iso.slice(0, 7);
@@ -148,6 +152,9 @@ export function reconstructPortfolio(data: ParsedExport): PortfolioSummary {
         const proceeds = op.amount; // positive inflow
         const realized = proceeds - costRemoved;
         realizedByTicker.set(op.ticker, (realizedByTicker.get(op.ticker) ?? 0) + realized);
+        // Annual value-limit test (§4/1/w ZDP): gross proceeds from stock sells
+        // in the current calendar year, regardless of profit/loss.
+        if (op.time.slice(0, 4) === currentYear) taxYearSoldCzk += proceeds;
         break;
       }
       case DISPOSAL_OP_TYPE: {
@@ -225,6 +232,7 @@ export function reconstructPortfolio(data: ParsedExport): PortfolioSummary {
       avgNativePrice: shares ? nativeWeighted / shares : 0,
       realizedPnlCzk: realizedByTicker.get(ticker) ?? 0,
       dividendsCzk: dividendsByTicker.get(ticker) ?? 0,
+      lots: lots.map((l) => ({ shares: l.shares, time: l.time })),
     });
   }
   holdings.sort((a, b) => b.czkCostBasis - a.czkCostBasis);
@@ -281,5 +289,6 @@ export function reconstructPortfolio(data: ParsedExport): PortfolioSummary {
     dividendTickers,
     firstOpDate: ops[0]?.time ?? "",
     lastOpDate: ops[ops.length - 1]?.time ?? "",
+    taxYearSoldCzk,
   };
 }

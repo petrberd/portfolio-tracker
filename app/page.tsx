@@ -15,6 +15,7 @@ import { AnalystPanel } from "@/components/Analysts";
 import { StockDetail } from "@/components/StockDetail";
 import { DividendCalendar } from "@/components/DividendCalendar";
 import { InfoTip } from "@/components/InfoTip";
+import { holdingTaxStatus, ANNUAL_VALUE_LIMIT_CZK } from "@/lib/taxtest";
 
 type Data = any;
 const VALUE_FROM = "2024-10-31"; // value-over-time chart starts here
@@ -305,6 +306,30 @@ export default function Page() {
         </div>
       </div>
 
+      {/* Tax time test + annual value-limit exemption */}
+      <div className="mt-6">
+        <Section
+          title="Daňový přehled"
+          subtitle="Osvobození od daně z příjmu při prodeji akcií (§4/1/w ZDP)"
+          hint="Orientační výpočet, ne daňové poradenství. Prodej je osvobozen, pokud je splněna ALESPOŇ JEDNA podmínka: časový test (držba přes 3 roky od nákupu, po jednotlivých FIFO tranších) nebo roční hodnotový limit (celkový hrubý příjem z prodeje CP v kalendářním roce do 100 000 Kč, bez ohledu na dobu držby)."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <MiniStat
+              label="Využito ročního limitu"
+              value={`${czk(s.taxYearSoldCzk ?? 0)} / ${czk(ANNUAL_VALUE_LIMIT_CZK)}`}
+              tone={(s.taxYearSoldCzk ?? 0) > ANNUAL_VALUE_LIMIT_CZK ? "neg" : undefined}
+              hint="Hrubý příjem (ne zisk) z prodeje akcií v aktuálním kalendářním roce. Pod 100 000 Kč je zisk osvobozený bez ohledu na dobu držby."
+            />
+            <MiniStat
+              label="Zbývá do limitu"
+              value={czk(Math.max(0, ANNUAL_VALUE_LIMIT_CZK - (s.taxYearSoldCzk ?? 0)))}
+              hint="Kolik ještě letos můžeš prodat (hrubý příjem), aby zisk zůstal osvobozený i bez splnění časového testu."
+            />
+          </div>
+          <TaxTestTable holdings={holdings} />
+        </Section>
+      </div>
+
       {/* Analyst forecasts & ratings */}
       <div className="mt-6">
         <AnalystPanel holdings={holdings.map((h) => ({ symbol: h.symbol, instrument: h.instrument }))} refreshTick={refreshTick} />
@@ -502,6 +527,51 @@ function HoldingsTable({
               </td>
               <td className="hidden sm:table-cell text-right tabular-nums text-muted">
                 {total > 0 ? `${((h.marketValueCzk / total) * 100).toFixed(1)} %` : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TaxTestTable({ holdings }: { holdings: any[] }) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const rows = holdings.map((h) => ({ h, status: holdingTaxStatus(h.lots ?? [], todayIso) }));
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-muted text-xs uppercase tracking-wide border-b border-line">
+            <th className="text-left font-medium py-2">Titul</th>
+            <th className="text-right font-medium py-2">Kusů celkem</th>
+            <th className="text-right font-medium py-2">Osvobozeno (časový test)</th>
+            <th className="text-right font-medium py-2">Příští osvobození</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ h, status }) => (
+            <tr key={h.ticker} className="border-b border-line/50">
+              <td className="py-2.5">
+                <div className="font-medium">{h.instrument}</div>
+                <div className="text-muted text-xs">{h.ticker}</div>
+              </td>
+              <td className="text-right tabular-nums">{num(status.totalShares, 4)}</td>
+              <td className="text-right tabular-nums">
+                {num(status.exemptShares, 4)}
+                {status.pendingShares <= 1e-6 && <span className="text-pos text-xs ml-1">✓ vše</span>}
+              </td>
+              <td className="text-right tabular-nums text-muted">
+                {status.nextExemptDate ? (
+                  <>
+                    {shortDate(status.nextExemptDate)}{" "}
+                    <span className="text-xs">({num(status.nextExemptShares, 4)} ks)</span>
+                  </>
+                ) : (
+                  "—"
+                )}
               </td>
             </tr>
           ))}
