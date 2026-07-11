@@ -51,6 +51,7 @@ export default function Page() {
   const [detail, setDetail] = useState<{ ticker: string; instrument: string } | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const revolutFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (force = false) => {
     force ? setRefreshing(true) : setLoading(true);
@@ -87,7 +88,7 @@ export default function Page() {
     return () => clearInterval(id);
   }, [load]);
 
-  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>, broker: "xtb" | "revolut" = "xtb") => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImporting(true);
@@ -95,6 +96,7 @@ export default function Page() {
     try {
       const form = new FormData();
       form.append("file", file);
+      form.append("broker", broker);
       const res = await fetch("/api/import", { method: "POST", body: form });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Import selhal.");
@@ -103,7 +105,7 @@ export default function Page() {
       setError(e?.message ?? "Import selhal.");
     } finally {
       setImporting(false);
-      if (fileRef.current) fileRef.current.value = "";
+      e.target.value = "";
     }
   };
 
@@ -113,8 +115,11 @@ export default function Page() {
     return (
       <div className="max-w-2xl mx-auto px-6 py-24 text-center">
         <h1 className="text-2xl font-semibold mb-2">Portfolio Tracker</h1>
-        <p className="text-muted mb-8">Zatím nemáš naimportovaná data z XTB.</p>
-        <UploadButton fileRef={fileRef} onUpload={onUpload} importing={importing} big />
+        <p className="text-muted mb-8">Zatím nemáš naimportovaná data z XTB ani Revolutu.</p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <UploadButton fileRef={fileRef} onUpload={onUpload} importing={importing} broker="xtb" big />
+          <UploadButton fileRef={revolutFileRef} onUpload={onUpload} importing={importing} broker="revolut" big />
+        </div>
         {error && <p className="text-neg mt-4 text-sm">{error}</p>}
       </div>
     );
@@ -170,7 +175,7 @@ export default function Page() {
         <div>
           <h1 className="text-2xl font-semibold">Portfolio Tracker</h1>
           <p className="text-muted text-sm mt-1">
-            XTB účet {data.accountNumber} · {holdings.length} otevřených pozic · ceny z{" "}
+            Účet {data.accountNumber} · {holdings.length} otevřených pozic · ceny z{" "}
             {data.importedAt ? shortDate(data.importedAt) : "—"}
           </p>
         </div>
@@ -185,7 +190,8 @@ export default function Page() {
             </button>
             <InfoTip text="Ihned stáhne aktuální ceny akcií, kurz a rating analytiků (jinak se stránka sama obnovuje každých 5 minut)." />
           </div>
-          <UploadButton fileRef={fileRef} onUpload={onUpload} importing={importing} />
+          <UploadButton fileRef={fileRef} onUpload={onUpload} importing={importing} broker="xtb" label="↑ XTB" />
+          <UploadButton fileRef={revolutFileRef} onUpload={onUpload} importing={importing} broker="revolut" label="↑ Revolut" />
         </div>
       </div>
 
@@ -198,14 +204,14 @@ export default function Page() {
             label="Volná hotovost"
             value={czk(s.freeCash ?? 0)}
             sub={(s.cashAccounts ?? []).map((a: any) => a.name).join(" + ") || undefined}
-            hint="Hotovost na spořicích účtech mimo XTB. Nastavuje se v data/cash.json."
+            hint="Hotovost na spořicích účtech mimo brokerské účty. Nastavuje se v data/cash.json."
           />
         )}
         <Kpi
           label="Tržní hodnota"
           value={czk(s.totalMarketValue + (s.xtbCash ?? 0))}
           sub={`vč. volných ${czk(s.xtbCash ?? 0)}`}
-          hint="Celková hodnota XTB účtu: tržní hodnota držených akcií (kusy × živá cena × kurz) + volné nezainvestované prostředky na XTB."
+          hint="Celková hodnota brokerských účtů (XTB + Revolut): tržní hodnota držených akcií (kusy × živá cena × kurz) + volné nezainvestované prostředky."
         />
         <Kpi
           label="Nerealizovaný zisk"
@@ -422,7 +428,7 @@ export default function Page() {
       </div>
 
       <p className="text-center text-muted text-xs mt-10">
-        Ceny: Yahoo Finance · Výpočet pozic: FIFO z XTB Cash Operations · Pouze pro osobní přehled, ne investiční poradenství.
+        Ceny: Yahoo Finance · Výpočet pozic: FIFO z XTB/Revolut transakcí · Pouze pro osobní přehled, ne investiční poradenství.
       </p>
 
       {detail && <StockDetail ticker={detail.ticker} instrument={detail.instrument} onClose={() => setDetail(null)} />}
@@ -626,15 +632,24 @@ function TaxTestTable({ holdings }: { holdings: any[] }) {
   );
 }
 
-function UploadButton({ fileRef, onUpload, importing, big }: any) {
+function UploadButton({ fileRef, onUpload, importing, big, broker = "xtb", label }: any) {
+  const accept = broker === "revolut" ? ".csv" : ".xlsx,.xls";
+  const defaultLabel = broker === "revolut" ? "Nahrát Revolut export (.csv)" : "Nahrát XTB export (.xlsx)";
   return (
     <label
-      className={`inline-flex items-center gap-2 rounded-xl bg-brand text-white cursor-pointer hover:opacity-90 transition ${
-        big ? "px-5 py-3 text-base" : "px-3 py-2 text-sm"
-      }`}
+      className={`inline-flex items-center gap-2 rounded-xl transition cursor-pointer ${
+        broker === "revolut" ? "border border-line hover:bg-panel2" : "bg-brand text-white hover:opacity-90"
+      } ${big ? "px-5 py-3 text-base" : "px-3 py-2 text-sm"}`}
     >
-      {importing ? "Importuji…" : big ? "Nahrát XTB export (.xlsx)" : "↑ Nahrát export"}
-      <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={onUpload} disabled={importing} />
+      {importing ? "Importuji…" : label ?? (big ? defaultLabel : "↑ Nahrát export")}
+      <input
+        ref={fileRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => onUpload(e, broker)}
+        disabled={importing}
+      />
     </label>
   );
 }

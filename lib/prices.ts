@@ -82,14 +82,27 @@ async function fetchChartRaw(symbol: string): Promise<Chart | null> {
   };
 }
 
-/** Fetch (and cache) the chart for one symbol. `force` bypasses the cache. */
+/**
+ * Fetch (and cache) the chart for one symbol. `force` bypasses the cache.
+ *
+ * If the bare symbol has no data (empty history — Yahoo needs an exchange
+ * suffix for most non-US listings) and it doesn't already carry one, retries
+ * once with `.DE` (Xetra). This matters for brokers like Revolut whose export
+ * gives no exchange info at all, unlike XTB's own suffixed tickers — verified
+ * empirically against two real Revolut-held European ETFs that only resolved
+ * as e.g. "4COP.DE"/"CEBS.DE", not the bare ticker. Best-effort, not a general
+ * solution for every exchange (see lib/parseRevolut.ts).
+ */
 export async function fetchChart(symbol: string, force = false): Promise<Chart | null> {
   if (!symbol) return null;
   const c = await loadCache();
   const hit = c[symbol];
   if (!force && hit && Date.now() - hit.fetchedAt < TTL_MS) return hit.chart;
   try {
-    const chart = await fetchChartRaw(symbol);
+    let chart = await fetchChartRaw(symbol).catch(() => null);
+    if ((!chart || !chart.closes.length) && !symbol.includes(".")) {
+      chart = await fetchChartRaw(`${symbol}.DE`).catch(() => null);
+    }
     if (chart && chart.closes.length) {
       c[symbol] = { fetchedAt: Date.now(), chart };
       await saveCache();
