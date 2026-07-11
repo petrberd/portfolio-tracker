@@ -142,14 +142,16 @@ export default function Page() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => load(true)}
-            disabled={refreshing}
-            title="Ihned stáhne aktuální ceny akcií, kurz a rating analytiků (jinak se stránka sama obnovuje každých 5 minut)."
-            className="text-sm px-3 py-2 rounded-xl border border-line hover:bg-panel2 transition disabled:opacity-50"
-          >
-            {refreshing ? "Stahuji…" : "↻ Obnovit ceny"}
-          </button>
+          <div className="flex items-center">
+            <button
+              onClick={() => load(true)}
+              disabled={refreshing}
+              className="text-sm px-3 py-2 rounded-xl border border-line hover:bg-panel2 transition disabled:opacity-50"
+            >
+              {refreshing ? "Stahuji…" : "↻ Obnovit ceny"}
+            </button>
+            <InfoTip text="Ihned stáhne aktuální ceny akcií, kurz a rating analytiků (jinak se stránka sama obnovuje každých 5 minut)." />
+          </div>
           <UploadButton fileRef={fileRef} onUpload={onUpload} importing={importing} />
         </div>
       </div>

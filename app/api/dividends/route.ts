@@ -59,11 +59,23 @@ export async function GET(req: NextRequest) {
     return s;
   };
 
+  // Fixed 12-month window starting NEXT month (e.g. run in 2026-07 → window 2026-08..2027-07).
+  // The current month is skipped since it's typically already (partly) in the past.
+  const now = new Date();
+  const monthKeys: string[] = [];
+  for (let i = 1; i <= 12; i++) {
+    monthKeys.push(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + i, 1)).toISOString().slice(0, 7));
+  }
+  const windowSet = new Set(monthKeys);
+  const startMonth = monthKeys[0];
+  const windowStartIso = `${startMonth}-01`;
+  const windowEndIso = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 13, 1)).toISOString().slice(0, 10);
+
   const payments: Payment[] = [];
   for (const { h, currency, meta } of enriched) {
     if (!meta) continue;
     const rate = fx.get(currency) ?? 21;
-    for (const p of projectPayments(meta, 12)) {
+    for (const p of projectPayments(meta, windowStartIso, windowEndIso)) {
       const qualifyingShares = sharesAsOf(h.ticker, p.exDate); // eligible shares at ex-date
       if (qualifyingShares <= 1e-6) continue;
       payments.push({
@@ -81,16 +93,6 @@ export async function GET(req: NextRequest) {
       });
     }
   }
-
-  // Fixed 12-month window starting NEXT month (e.g. run in 2026-07 → window 2026-08..2027-07).
-  // The current month is skipped since it's typically already (partly) in the past.
-  const now = new Date();
-  const monthKeys: string[] = [];
-  for (let i = 1; i <= 12; i++) {
-    monthKeys.push(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + i, 1)).toISOString().slice(0, 7));
-  }
-  const windowSet = new Set(monthKeys);
-  const startMonth = monthKeys[0];
 
   // Interest from external savings accounts: net of withholding tax, credited on
   // the 1st of each month in the window.

@@ -2,9 +2,10 @@ import { readJson, writeJson } from "./storage";
 
 /**
  * Dividend schedule per symbol: payment frequency, amount per share, and the
- * next ex-dividend / pay dates. Nasdaq (real ex+pay dates, Nasdaq-listed only)
- * is preferred; Yahoo chart dividend events are the fallback for everything
- * else (ex-dates are real, pay date is estimated from the ex→pay lag).
+ * next ex-dividend / pay dates. Preference order: Nasdaq (real ex+pay dates,
+ * Nasdaq-listed only) → stockanalysis.com dividend history (real ex+pay
+ * dates, covers NYSE etc. too) → Yahoo chart dividend events as the last
+ * resort (ex-dates are real, pay date is a generic 14-day-lag guess).
  */
 
 const CACHE_KEY = "divcal.json";
@@ -17,7 +18,7 @@ export interface DivMeta {
   nextEx: string; // next UPCOMING ex-date (rolled forward) — for display
   nextPay: string; // pay date of the next upcoming ex — for display
   lagDays: number; // ex -> pay lag
-  source: "nasdaq" | "yahoo";
+  source: "nasdaq" | "stockanalysis" | "yahoo";
   estimatedPay: boolean;
 }
 
@@ -95,6 +96,68 @@ async function fromNasdaq(symbol: string): Promise<DivMeta | null> {
   return { perYear, perShare, anchorEx, nextEx, nextPay, lagDays, source: "nasdaq", estimatedPay: false };
 }
 
+/**
+ * Dereference one level of a devalue-encoded object (same format as
+ * lib/analysts.ts): `arr[idx]` is a plain object whose values are indices
+ * into `arr` pointing at the actual leaf values.
+ */
+function resolveShallow(arr: unknown[], idx: number): any {
+  const v = arr[idx];
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, childIdx] of Object.entries(v as Record<string, unknown>)) {
+      out[k] = typeof childIdx === "number" ? arr[childIdx] : childIdx;
+    }
+    return out;
+  }
+  return v;
+}
+
+/**
+ * Real ex-dividend + pay date history from stockanalysis.com's dividend page
+ * (`/stocks/<ticker>/dividend/__data.json`, SvelteKit "devalue" format — see
+ * lib/analysts.ts for the format notes). Covers NYSE etc., unlike the Nasdaq
+ * API which only returns data for Nasdaq-listed tickers.
+ */
+async function fromStockAnalysis(symbol: string): Promise<DivMeta | null> {
+  const res = await fetch(`https://stockanalysis.com/stocks/${symbol.toLowerCase()}/dividend/__data.json`, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+  });
+  if (!res.ok) return null;
+  const json: any = await res.json();
+  const nodes: any[] = json?.nodes ?? [];
+  let rows: { dt: string; amt: string; pay: string }[] = [];
+  for (const node of nodes) {
+    if (node?.type !== "data" || !Array.isArray(node.data)) continue;
+    const arr: unknown[] = node.data;
+    const fieldMap = arr.find(
+      (item): item is Record<string, number> => !!item && typeof item === "object" && "history" in item && "infoTable" in item
+    );
+    if (!fieldMap) continue;
+    const rowIdxs = arr[fieldMap.history] as number[];
+    if (!Array.isArray(rowIdxs)) continue;
+    rows = rowIdxs.map((i) => resolveShallow(arr, i)).filter((r) => r?.dt && /^\d{4}-\d{2}-\d{2}$/.test(r.dt));
+    break;
+  }
+  if (!rows.length) return null;
+
+  // Rows come most-recent-first.
+  const exDates = rows.map((r) => r.dt);
+  const perYear = detectFreq(exDates);
+  const perShare = parseMoney(rows[0].amt);
+  if (!perShare) return null;
+  const anchorEx = rows[0].dt;
+  // Real lag from the most recent row that actually has a pay date (the very
+  // latest dividend may still show "n/a" if unpaid as of the scrape).
+  const withPay = rows.find((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.pay));
+  const lagDays = withPay
+    ? Math.max(0, Math.round((new Date(withPay.pay).getTime() - new Date(withPay.dt).getTime()) / DAY))
+    : 14;
+  const nextEx = rollForward(anchorEx, perYear);
+  const nextPay = iso(new Date(new Date(nextEx).getTime() + lagDays * DAY));
+  return { perYear, perShare, anchorEx, nextEx, nextPay, lagDays, source: "stockanalysis", estimatedPay: true };
+}
+
 async function fromYahoo(symbol: string): Promise<DivMeta | null> {
   const res = await fetch(
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y&events=div`,
@@ -125,6 +188,7 @@ export async function fetchDividendMeta(symbol: string, force = false): Promise<
   let meta: DivMeta | null = null;
   try {
     meta = await fromNasdaq(symbol).catch(() => null);
+    if (!meta) meta = await fromStockAnalysis(symbol).catch(() => null);
     if (!meta) meta = await fromYahoo(symbol).catch(() => null);
   } catch (e) {
     console.error(`fetchDividendMeta failed for ${symbol}`, e);
@@ -143,17 +207,19 @@ export interface ProjectedPayment {
 }
 
 /**
- * Payments landing in the 12-month window that starts at the FIRST DAY of the
- * current month. Enumerated by pay-date, so a dividend that already went
- * ex-dividend but whose payment falls in the window (e.g. ex 30.6., pay 10.7.)
- * is included — as is one paid earlier this month.
+ * Payments landing in [windowStartIso, windowEndIso) (end exclusive), enumerated
+ * by pay-date — so a dividend that already went ex-dividend but whose payment
+ * falls in the window (e.g. ex 30.6., pay 10.7.) is included. The window is
+ * passed in by the caller so it always matches the caller's own month bucketing
+ * (previously this recomputed its own "current month" window internally, which
+ * silently drifted out of sync with the API route's window and truncated the
+ * last month's payments).
  */
-export function projectPayments(meta: DivMeta, months = 12): ProjectedPayment[] {
+export function projectPayments(meta: DivMeta, windowStartIso: string, windowEndIso: string): ProjectedPayment[] {
   const out: ProjectedPayment[] = [];
   const p = periodDays(meta.perYear);
-  const now = new Date();
-  const winStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
-  const winEnd = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + months, 1); // exclusive
+  const winStart = new Date(windowStartIso).getTime();
+  const winEnd = new Date(windowEndIso).getTime(); // exclusive
 
   // Position ex so the first payment lands at/after the window start.
   let ex = new Date(meta.anchorEx).getTime();
