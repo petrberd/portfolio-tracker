@@ -1,6 +1,6 @@
 # Portfolio Tracker
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.1-blue)](CHANGELOG.md)
 
 Lokální webová aplikace na sledování investičního portfolia z **XTB a/nebo Revolutu** —
 po vzoru Alocano / Stonkee. Naimportuje export z brokera(ů), zrekonstruuje aktuální pozice
@@ -146,9 +146,10 @@ uzavřenému dennímu close.
 - **Ceny** (`lib/prices.ts`) — přímé volání veřejného Yahoo Finance chart endpointu
   (`query1`, bez API klíče). Jeden dotaz na titul dá měnu, aktuální cenu i historii.
   Ceny se cachují 1 h do `data/prices.json` (tlačítko „Obnovit ceny" cache obchází).
-  Revolut export nemá u tickeru burzovní příponu (na rozdíl od XTB `MU.US`) — když
-  holý ticker na Yahoo nic nevrátí, zkusí se jednou fallback `.DE` (Xetra); ověřeno na
-  reálných datech, ale není to obecné řešení pro všechny burzy.
+  Revolut export nemá u tickeru burzovní příponu (na rozdíl od XTB `MU.US`) — když holý
+  ticker na Yahoo nic nevrátí, appka se zeptá Yahoo vyhledávacího API a vezme první reálně
+  fungující výsledek (funguje napříč burzami, ne jen pro jednu konkrétní); výsledek se
+  trvale cachuje, takže se hledání spustí jen jednou za ticker.
 - **Časová řada** (`lib/timeseries.ts`) — denní počty kusů × historické close × **dobový**
   FX kurz (ne dnešní) → hodnota v CZK. Benchmark vs. S&P 500 Total Return volí nejmenší
   dostatečný rozsah historie (1y/2y/5y/10y), aby se u staršího účtu tiše neuseknul.

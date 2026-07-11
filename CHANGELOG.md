@@ -4,6 +4,17 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.2.1] — 2026-07-11
+
+### Fixed
+- **Univerzální dohledání tickeru na Yahoo**, místo natvrdo zadaného `.DE` (Xetra) fallbacku.
+  Zkusí ticker rovnou, a pokud nemá data, zeptá se Yahoo vyhledávacího API a vezme první
+  reálně fungující výsledek — ověřeno na skutečných datech napříč různými burzami. Výsledek
+  se trvale cachuje, takže se hledání spustí jen jednou za ticker.
+- Ověřeno end-to-end s reálnými EUR pozicemi (4COP, CEBS) — formátování měny, denní změna,
+  FIFO cost basis, daňový časový test i „nedostupné" hláška u ETF v analytických odhadech
+  fungují správně.
+
 ## [1.2.0] — 2026-07-11
 
 ### Added
