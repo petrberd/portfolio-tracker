@@ -312,9 +312,9 @@ export default function Page() {
         </Section>
       </div>
 
-      {/* Allocation + holdings */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
-        <div className="lg:col-span-2 min-w-0 space-y-6">
+      {/* Allocation + holdings + earnings calendar */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6 items-stretch">
+        <div className="lg:col-span-3 min-w-0 space-y-6">
           <Section
             title="Alokace portfolia"
             subtitle="Podle tržní hodnoty"
@@ -333,13 +333,13 @@ export default function Page() {
           >
             {alloc.length ? <AllocationPie data={alloc} /> : <Empty msg="Žádné otevřené pozice." />}
           </Section>
-          <Section title="Earnings kalendář" subtitle="Nejbližší termín výsledků">
-            <EarningsCalendar refreshTick={refreshTick} />
-          </Section>
-        </div>
-        <div className="lg:col-span-3 min-w-0">
           <Section title="Pozice" subtitle="Klikni na titul pro detail, graf s tvými obchody a novinky">
             <HoldingsTable holdings={holdings} total={s.totalMarketValue} onSelect={setDetail} />
+          </Section>
+        </div>
+        <div className="lg:col-span-2 min-w-0 h-full">
+          <Section title="Earnings kalendář" subtitle="Nejbližší termín výsledků" className="h-full flex flex-col">
+            <EarningsCalendar refreshTick={refreshTick} />
           </Section>
         </div>
       </div>
@@ -462,16 +462,18 @@ function Section({
   subtitle,
   action,
   hint,
+  className,
   children,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
   hint?: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="card p-5 min-w-0">
+    <div className={`card p-5 min-w-0 ${className ?? ""}`}>
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold">
