@@ -1,0 +1,29 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- money bag -->
+  <path d="M256 176c98 0 182 82 182 172 0 84-84 148-182 148S74 432 74 348c0-90 84-172 182-172z" fill="#22b14c" stroke="#000" stroke-width="14" stroke-linejoin="round"/>
+  <path d="M256 176c98 0 182 82 182 172 0 84-84 148-182 148" fill="none" stroke="#000" stroke-width="0"/>
+  <path d="M120 348c0-84 70-160 156-171-14-2-30-3-46-1-90 12-156 88-156 172 0 78 72 138 158 147-70-16-112-77-112-147z" fill="#1a9c3f" opacity="0.55"/>
+
+  <!-- neck -->
+  <path d="M210 92c0-14 12-24 26-24h40c14 0 26 10 26 24 0 10-6 20-16 28l-10 26h-40l-10-26c-10-8-16-18-16-28z" fill="#22b14c" stroke="#000" stroke-width="14" stroke-linejoin="round"/>
+  <!-- neck tie band -->
+  <rect x="196" y="146" width="120" height="34" rx="17" fill="#ffc72c" stroke="#000" stroke-width="14"/>
+
+  <!-- dollar coin -->
+  <circle cx="220" cy="332" r="96" fill="#d7f5da" stroke="#000" stroke-width="14"/>
+  <circle cx="220" cy="332" r="70" fill="#d7f5da" opacity="0.001"/>
+  <text x="220" y="368" font-family="Arial, Helvetica, sans-serif" font-size="118" font-weight="700" fill="#000" text-anchor="middle">$</text>
+
+  <!-- bar chart -->
+  <rect x="248" y="392" width="34" height="66" fill="#ffc72c" stroke="#000" stroke-width="12"/>
+  <rect x="298" y="352" width="34" height="106" fill="#ffc72c" stroke="#000" stroke-width="12"/>
+  <rect x="348" y="304" width="34" height="154" fill="#ffc72c" stroke="#000" stroke-width="12"/>
+  <rect x="398" y="252" width="34" height="206" fill="#ffc72c" stroke="#000" stroke-width="12"/>
+  <rect x="448" y="184" width="34" height="274" fill="#ffc72c" stroke="#000" stroke-width="12"/>
+
+  <!-- baseline -->
+  <rect x="242" y="458" width="246" height="16" fill="#000"/>
+
+  <!-- growth arrow -->
+  <path d="M250 300c60 4 118-24 150-96l38-16-8 84-40-32c-30 68-92 98-140 92z" fill="#ffc72c" stroke="#000" stroke-width="14" stroke-linejoin="round"/>
+</svg>
