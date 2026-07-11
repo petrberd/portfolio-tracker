@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 const shortDate = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "2-digit" }) : "—";
@@ -21,12 +22,12 @@ export function EarningsCalendar({ refreshTick = 0 }: { refreshTick?: number }) 
     };
   }, [refreshTick]);
 
-  if (loading) return <div className="h-[120px] flex items-center justify-center text-muted text-sm">Načítám earnings kalendář…</div>;
+  if (loading) return <SkeletonBlock height={120} lines={3} />;
   if (!data?.available || !data.events?.length)
     return <div className="h-[120px] flex items-center justify-center text-muted text-sm">Žádné nadcházející earnings.</div>;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto animate-[fadein_.2s_ease-out]">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-muted text-xs uppercase tracking-wide border-b border-line">
@@ -43,7 +44,7 @@ export function EarningsCalendar({ refreshTick = 0 }: { refreshTick?: number }) 
               </td>
               <td className="text-right tabular-nums">
                 {shortDate(e.date)}
-                {e.estimated && <span className="text-[10px] ml-1 text-muted/70">(odhad)</span>}
+                {e.estimated && <span className="text-xs ml-1 text-muted">(odhad)</span>}
               </td>
             </tr>
           ))}

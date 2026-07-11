@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { InfoTip } from "@/components/InfoTip";
 import { SemiGauge } from "@/components/Gauge";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 const money = (v: number, ccy: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy || "USD", maximumFractionDigits: 2 }).format(v ?? 0);
@@ -95,14 +96,14 @@ export function AnalystPanel({ holdings, refreshTick = 0 }: { holdings: Holding[
   return (
     <div className="card p-5">
       {/* Header with selector + overall rating */}
-      <div className="flex items-center justify-between gap-4 border-b border-line pb-4 mb-4">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="stat-label">Analytické odhady ·</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4 mb-4">
+        <div className="flex items-center gap-2 text-sm min-w-0">
+          <span className="stat-label shrink-0">Analytické odhady ·</span>
           <select
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
             autoComplete="off"
-            className="bg-panel2 border border-line rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-brand"
+            className="bg-panel2 border border-line rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-brand min-w-0 max-w-[55vw] sm:max-w-none"
           >
             {holdings.map((h) => (
               <option key={h.symbol} value={h.symbol}>
@@ -112,13 +113,13 @@ export function AnalystPanel({ holdings, refreshTick = 0 }: { holdings: Holding[
           </select>
         </div>
         {rating && (
-          <span className="text-sm font-semibold px-2.5 py-1 rounded-lg" style={{ color: rating.color, background: `${rating.color}1f` }}>
+          <span className="text-sm font-semibold px-2.5 py-1 rounded-lg shrink-0" style={{ color: rating.color, background: `${rating.color}1f` }}>
             {rating.label}
           </span>
         )}
       </div>
 
-      {loading && <div className="h-[240px] flex items-center justify-center text-muted text-sm">Načítám odhady…</div>}
+      {loading && <SkeletonBlock height={240} lines={5} />}
 
       {!loading && data && !data.available && (
         <div className="h-[240px] flex items-center justify-center text-muted text-sm text-center px-6">
@@ -127,7 +128,7 @@ export function AnalystPanel({ holdings, refreshTick = 0 }: { holdings: Holding[
       )}
 
       {!loading && a && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-[fadein_.2s_ease-out]">
           {/* Fair value gauge */}
           <div className="min-w-0">
             <div className="stat-label">

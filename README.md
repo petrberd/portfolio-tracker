@@ -1,6 +1,6 @@
 # Portfolio Tracker
 
-[![Version](https://img.shields.io/badge/version-1.2.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue)](CHANGELOG.md)
 
 Lokální webová aplikace na sledování investičního portfolia z **XTB a/nebo Revolutu** —
 po vzoru Alocano / Stonkee. Naimportuje export z brokera(ů), zrekonstruuje aktuální pozice

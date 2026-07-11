@@ -510,7 +510,7 @@ function Toggle({
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
-          className={`px-3 py-1.5 transition ${
+          className={`px-3.5 py-2.5 min-h-[44px] transition ${
             value === o.value ? "bg-brand text-white" : "text-muted hover:bg-panel2"
           }`}
         >
@@ -552,10 +552,24 @@ function HoldingsTable({
             >
               <td className="py-2.5">
                 <div className="flex items-center gap-2.5">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: PALETTE[i % PALETTE.length] }} />
-                  <div>
+                  <span className="w-2 h-2 rounded-full shrink-0 mt-0.5 self-start" style={{ background: PALETTE[i % PALETTE.length] }} />
+                  <div className="min-w-0">
                     <div className="font-medium">{h.instrument}</div>
                     <div className="text-muted text-xs">{h.ticker}</div>
+                    {/* Mobile-only: the columns hidden below sm are folded in here so nothing is lost. */}
+                    <div className="sm:hidden flex flex-wrap items-center gap-x-2 gap-y-0.5 text-muted text-[11px] mt-1">
+                      <span>{num(h.shares, 4)} ks</span>
+                      {h.avgNativePrice && <span>⌀ {num(h.avgNativePrice)} {h.currency}</span>}
+                      {h.livePrice && (
+                        <span>
+                          {num(h.livePrice)} {h.currency}
+                          {h.dayChangePercent ? (
+                            <span className={h.dayChangePercent >= 0 ? "text-pos" : "text-neg"}> {pct(h.dayChangePercent)}</span>
+                          ) : null}
+                        </span>
+                      )}
+                      {total > 0 && <span>{((h.marketValueCzk / total) * 100).toFixed(1)} % podílu</span>}
+                    </div>
                   </div>
                 </div>
               </td>
@@ -597,9 +611,9 @@ function TaxTestTable({ holdings }: { holdings: any[] }) {
         <thead>
           <tr className="text-muted text-xs uppercase tracking-wide border-b border-line">
             <th className="text-left font-medium py-2">Titul</th>
-            <th className="text-right font-medium py-2">Kusů celkem</th>
+            <th className="hidden sm:table-cell text-right font-medium py-2">Kusů celkem</th>
             <th className="text-right font-medium py-2">Osvobozeno (časový test)</th>
-            <th className="text-right font-medium py-2">Příští osvobození</th>
+            <th className="hidden sm:table-cell text-right font-medium py-2">Příští osvobození</th>
           </tr>
         </thead>
         <tbody>
@@ -608,13 +622,22 @@ function TaxTestTable({ holdings }: { holdings: any[] }) {
               <td className="py-2.5">
                 <div className="font-medium">{h.instrument}</div>
                 <div className="text-muted text-xs">{h.ticker}</div>
+                {/* Mobile-only: kusů celkem/příští osvobození folded in here since those columns hide below sm. */}
+                <div className="sm:hidden flex flex-wrap gap-x-2 text-muted text-[11px] mt-1">
+                  <span>{num(status.totalShares, 4)} ks celkem</span>
+                  {status.nextExemptDate && (
+                    <span>
+                      další {shortDate(status.nextExemptDate)} ({num(status.nextExemptShares, 4)} ks)
+                    </span>
+                  )}
+                </div>
               </td>
-              <td className="text-right tabular-nums">{num(status.totalShares, 4)}</td>
+              <td className="hidden sm:table-cell text-right tabular-nums">{num(status.totalShares, 4)}</td>
               <td className="text-right tabular-nums">
                 {num(status.exemptShares, 4)}
                 {status.pendingShares <= 1e-6 && <span className="text-pos text-xs ml-1">✓ vše</span>}
               </td>
-              <td className="text-right tabular-nums text-muted">
+              <td className="hidden sm:table-cell text-right tabular-nums text-muted">
                 {status.nextExemptDate ? (
                   <>
                     {shortDate(status.nextExemptDate)}{" "}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Area,
   Bar,
@@ -18,6 +19,19 @@ import {
   YAxis,
 } from "recharts";
 import { czk, monthLabel, pct, shortDate } from "@/lib/format";
+
+/** True below the sm breakpoint — lets charts thin out/rotate x-axis ticks on narrow phones. */
+function useIsMobile() {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    setMobile(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setMobile(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return mobile;
+}
 
 const PALETTE = [
   "#5b8cff", "#22c55e", "#f59e0b", "#ec4899", "#14b8a6",
@@ -130,11 +144,23 @@ export function VixChart({ data }: { data: { date: string; vix: number }[] }) {
 
 /** Per-period portfolio performance (market gain, contributions removed). */
 export function PerformanceChart({ data }: { data: { period: string; gain: number; gainPct: number }[] }) {
+  const isMobile = useIsMobile();
+  // On phones, all-horizontal labels for every month collide into unreadable overlap.
+  // Angle them and, if there are a lot of bars, skip every other label.
+  const crowded = isMobile && data.length > 6;
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={data} margin={{ top: 10, right: 8, left: 8, bottom: 0 }}>
+    <ResponsiveContainer width="100%" height={crowded ? 320 : 300}>
+      <BarChart data={data} margin={{ top: 10, right: 8, left: 8, bottom: crowded ? 22 : 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#1b2438" vertical={false} />
-        <XAxis dataKey="period" tick={axisStyle} interval={0} tickFormatter={periodLabel} />
+        <XAxis
+          dataKey="period"
+          tick={{ ...axisStyle, fontSize: crowded ? 10 : 11 }}
+          interval={crowded ? 1 : 0}
+          angle={crowded ? -45 : 0}
+          textAnchor={crowded ? "end" : "middle"}
+          height={crowded ? 40 : 30}
+          tickFormatter={periodLabel}
+        />
         <YAxis tick={axisStyle} width={64} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
         <Tooltip
           contentStyle={tooltipStyle}

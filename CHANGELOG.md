@@ -4,6 +4,30 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.3.0] — 2026-07-11
+
+### Added
+- **Skeleton loading placeholders** (shimmer bloky místo textu „Načítám…") pro detail titulu,
+  earnings/dividendový kalendář, náladu trhu (VIX) a analytické odhady, s jemným fade-in po
+  načtení dat.
+
+### Fixed
+- **Mobilní revize (iPhone 16 Pro, 402 px) — osa X u „Výkonnost portfolia"** byla nečitelná
+  (všechny měsíce natlačené vodorovně přes sebe). Na mobilu se teď popisky natočí o -45° a při
+  více než 6 sloupcích se zobrazuje jen každý druhý.
+- **Sekce Pozice na mobilu** skrývala kusy/průměrnou cenu/aktuální cenu/podíl (`hidden sm:table-cell`).
+  Tyto údaje se teď zobrazují jako sbalený druhý řádek pod názvem titulu, takže je vidět totéž
+  co na desktopu, jen kompaktněji. Stejný vzor aplikován i na Dividendový kalendář a Daňový přehled.
+- **Vysvětlivky (ⓘ) fungovaly jen na hover** — na dotykových zařízeních byly fakticky nedostupné.
+  Teď se otevírají klepnutím a zavírají klepnutím mimo; dotyková plocha ikonky zvětšena z ~14 px
+  na 24 px.
+- Přepínací tlačítka (Měsíce/Roky, alokace) zvětšena na min. 44 px výšky (dotykový standard).
+- Řádky insider obchodů v detailu titulu teď zalamují přes více řádků místo natlačení do jednoho.
+- Zavírací tlačítko (✕) v detailu titulu má teď kruhové orámování a hover pozadí, konzistentní
+  s ostatními tlačítky v appce.
+- Popisky „(odhad)" zvětšeny a zesvětleny (byly 10-11 px při nízké opacitě, hraničily s WCAG AA).
+- Hlavička analytického panelu (výběr titulu + rating) teď zalamuje na užších obrazovkách.
+
 ## [1.2.1] — 2026-07-11
 
 ### Fixed

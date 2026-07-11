@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { InfoTip } from "@/components/InfoTip";
 import { SemiGauge } from "@/components/Gauge";
 import { VixChart } from "@/components/Charts";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 // VIX level bands — the commonly-cited rule-of-thumb reading of the index, not
 // an official CBOE classification.
@@ -37,14 +38,14 @@ export function MarketMood({ refreshTick = 0 }: { refreshTick?: number }) {
     };
   }, [refreshTick]);
 
-  if (loading) return <div className="h-[240px] flex items-center justify-center text-muted text-sm">Načítám VIX…</div>;
+  if (loading) return <SkeletonBlock height={240} lines={4} />;
   if (!data?.available)
     return <div className="h-[120px] flex items-center justify-center text-muted text-sm">VIX se nepodařilo načíst.</div>;
 
   const level = levelFor(data.vix);
 
   return (
-    <div>
+    <div className="animate-[fadein_.2s_ease-out]">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center mb-4">
         <div className="min-w-0">
           <div className="text-4xl font-semibold">{data.vix.toFixed(1)}</div>

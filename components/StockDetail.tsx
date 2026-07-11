@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { InfoTip } from "@/components/InfoTip";
+import { SkeletonBlock } from "@/components/Skeleton";
 
 const money = (v: number, ccy: string, d = 2) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy || "USD", maximumFractionDigits: d }).format(v ?? 0);
@@ -90,7 +91,11 @@ export function StockDetail({
         className="card w-full max-w-4xl my-4 p-6 relative"
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onClose} className="absolute top-4 right-4 text-muted hover:text-white text-xl leading-none">
+        <button
+          onClick={onClose}
+          aria-label="Zavřít"
+          className="absolute top-3 right-3 w-9 h-9 inline-flex items-center justify-center rounded-full border border-line text-muted hover:text-white hover:bg-panel2 transition text-lg leading-none"
+        >
           ✕
         </button>
 
@@ -103,10 +108,10 @@ export function StockDetail({
           )}
         </div>
 
-        {loading && <div className="h-[380px] flex items-center justify-center text-muted">Načítám detail…</div>}
+        {loading && <SkeletonBlock height={380} lines={6} />}
 
         {!loading && d && (
-          <>
+          <div className="animate-[fadein_.2s_ease-out]">
             {/* Fundamentals strip */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
               <Metric label="Tržní kap." value={marketCap != null ? bigMoney(marketCap, ccy) : "—"} hint="Tržní kapitalizace = aktuální cena × počet akcií." />
@@ -129,7 +134,7 @@ export function StockDetail({
                 </span>
                 <span className="text-muted">
                   Výplata <span className="text-white font-medium">{shortDate(d.dividend.nextPay)}</span>
-                  {d.dividend.estimatedPay && <span className="text-[10px] ml-1">(odhad)</span>}
+                  {d.dividend.estimatedPay && <span className="text-xs ml-1 text-muted">(odhad)</span>}
                 </span>
                 <span className="text-muted">
                   <span className="text-white font-medium">{money(d.dividend.perShare, ccy)}</span>/akcii ·{" "}
@@ -207,12 +212,12 @@ export function StockDetail({
                   {d.insider.slice(0, 8).map((t: any, i: number) => {
                     const buy = t.change > 0;
                     return (
-                      <li key={i} className="flex items-center gap-2 text-sm">
-                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${buy ? "text-pos bg-pos/10" : "text-neg bg-neg/10"}`}>
+                      <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm py-1">
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded shrink-0 ${buy ? "text-pos bg-pos/10" : "text-neg bg-neg/10"}`}>
                           {buy ? "koupil" : "prodal"}
                         </span>
-                        <span className="truncate flex-1 text-white/85">{t.name}</span>
-                        <span className="tabular-nums text-muted shrink-0">
+                        <span className="text-white/85 min-w-0 break-words">{t.name}</span>
+                        <span className="tabular-nums text-muted shrink-0 ml-auto">
                           {buy ? "+" : ""}
                           {Math.round(t.change).toLocaleString("cs-CZ")} ks
                           {t.price ? ` @ ${money(t.price, ccy)}` : ""}
@@ -243,7 +248,7 @@ export function StockDetail({
                 <p className="text-muted text-sm">Žádné novinky.</p>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

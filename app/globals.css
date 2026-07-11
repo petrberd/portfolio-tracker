@@ -26,3 +26,12 @@ body {
 .stat-label {
   @apply text-muted text-xs uppercase tracking-wide;
 }
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
