@@ -144,7 +144,7 @@ export function BenchmarkChart({ data }: { data: { date: string; portfolio: numb
         />
         <Legend wrapperStyle={{ fontSize: 12, paddingTop: 6 }} formatter={legendText} />
         <Line type="monotone" dataKey="portfolio" stroke="#5b8cff" strokeWidth={2.2} dot={false} name="Tvé portfolio" />
-        <Line type="monotone" dataKey="sp500" stroke="#f59e0b" strokeWidth={2} dot={false} name="S&P 500" />
+        <Line type="monotone" dataKey="sp500" stroke="#f59e0b" strokeWidth={2} dot={false} name="S&P 500 (Total Return)" />
       </ComposedChart>
     </ResponsiveContainer>
   );

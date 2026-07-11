@@ -278,13 +278,20 @@ export function computeRiskMetrics(series: ValuePoint[]): RiskMetrics | null {
 export interface BenchmarkPoint {
   date: string;
   portfolio: number; // cumulative TWR index, rebased to 100
-  sp500: number; // S&P 500 index, rebased to 100
+  sp500: number; // S&P 500 TOTAL RETURN index (incl. reinvested dividends), rebased to 100
 }
 
-/** Portfolio TWR vs. S&P 500, both rebased to 100 at the first shared date. */
+/**
+ * Portfolio TWR vs. S&P 500, both rebased to 100 at the first shared date.
+ * Uses ^SP500TR (total return, dividends reinvested) rather than the plain
+ * ^GSPC price index — the portfolio side already includes dividends/interest
+ * in its value, so comparing it against a dividend-free index would understate
+ * the benchmark by roughly its ~1.3-1.5%/year yield.
+ */
 export async function buildBenchmark(series: ValuePoint[]): Promise<BenchmarkPoint[]> {
   if (series.length < 2) return [];
-  const spCloses = await fetchDailyCloses("^GSPC", "2y");
+  let spCloses = await fetchDailyCloses("^SP500TR", "2y");
+  if (!spCloses.length) spCloses = await fetchDailyCloses("^GSPC", "2y"); // fallback if TR index is ever unavailable
   if (!spCloses.length) return [];
   const spByDate = new Map(spCloses.map((c) => [c.date, c.close]));
 

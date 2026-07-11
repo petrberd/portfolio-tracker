@@ -243,8 +243,8 @@ export default function Page() {
       <div className="mt-6">
         <Section
           title="Výkonnost vs. trh"
-          subtitle="Tvé portfolio (TWR) vs. S&P 500, přepočteno na 100 k počátku"
-          hint="Obě křivky startují na 100. ^GSPC je cenový index bez dividend, takže reálný náskok S&P je mírně vyšší (o dividendy)."
+          subtitle="Tvé portfolio (TWR) vs. S&P 500 Total Return, přepočteno na 100 k počátku"
+          hint="Obě křivky startují na 100. S&P 500 je počítáno jako Total Return index (^SP500TR, vč. reinvestovaných dividend) — fér srovnání proti tvému portfoliu, které dividendy a úroky taky zahrnuje do výkonnosti."
         >
           {risk && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
