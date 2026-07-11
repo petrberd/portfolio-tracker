@@ -87,9 +87,9 @@ reálné riziko je zanedbatelné.
   (i dividend, vkladů) se odvozuje automaticky od prvního obchodu na účtu, ne z natvrdo
   zadaného data — funguje i pro účet s jinou historií.
 - **Zisk/ztráta** — nerealizovaný (živé ceny) i realizovaný P/L, výnos v %.
-- **Volná hotovost** — spořicí účty mimo XTB (`data/cash.json` lokálně / `CASH_CONFIG_JSON`
-  na Netlify), oddělená KPI od hotovosti přímo na XTB účtu. Dlaždice se schová, když žádné
-  externí účty nejsou nastavené.
+- **Volná hotovost** — spořicí účty mimo brokerské účty (`data/cash.json` lokálně /
+  `CASH_CONFIG_JSON` na Netlify), oddělená KPI od hotovosti přímo na XTB/Revolut účtu.
+  Dlaždice se schová, když žádné externí účty nejsou nastavené.
 - **Alokace** — přepínač Pozice / Sektory (Finnhub) / Měny.
 - **Vklady** — měsíční vklady + průměrný vklad za měsíc.
 - **Výkonnost vs. trh** — portfolio (TWR) vs. **S&P 500 Total Return** (`^SP500TR`, vč.
@@ -122,6 +122,11 @@ reálné riziko je zanedbatelné.
 Insider obchody a sektory (v detailu titulu) vyžadují **Finnhub API klíč** v `.env.local`
 (`FINNHUB_API_KEY`); free tier stačí. Institucionální držba a cílové ceny (Finnhub) jsou jen
 v placeném tieru — vynechány.
+
+> Analytické odhady, earnings kalendář a insider obchody čerpají z US-centrických zdrojů
+> (stockanalysis.com, Finnhub) — u evropských titulů z Revolutu (např. ETF bez US listingu)
+> proto tahle data většinou nebudou k dispozici; appka to poctivě ukáže jako „nedostupné",
+> ne jako chybu. Ceny, FX, pozice, dividendy a daňový časový test fungují pro oba brokery stejně.
 
 Tlačítko **Obnovit ceny** obchází cache a stáhne aktuální ceny; appka se navíc sama obnovuje
 každých 5 minut. Denní změna se počítá z živé ceny (`regularMarketPrice`) proti poslednímu
