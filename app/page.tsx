@@ -20,6 +20,11 @@ type Data = any;
 const VALUE_FROM = "2024-10-31"; // value-over-time chart starts here
 const DEPOSITS_FROM = "2024-10"; // deposits chart from Oct 2024 on
 const DIVIDENDS_FROM = "2025-01"; // dividends chart from Jan 2025 on
+const PERFORMANCE_FROM = "2024-08"; // monthly performance chart starts here (yearly view is unfiltered)
+// These are lower bounds only — every chart's upper end is "today", computed fresh on
+// each request from live data, so new months (deposits, dividends, performance, the
+// income projection) show up on their own as time passes. Nothing here needs a manual
+// monthly bump.
 
 export default function Page() {
   const [data, setData] = useState<Data | null>(null);
@@ -104,7 +109,9 @@ export default function Page() {
   const s = data.summary;
   const holdings = data.holdings as any[];
   const series = (data.series as any[]).filter((p) => p.date >= VALUE_FROM);
-  const perf = (data.performance?.[perfMode] ?? []) as any[];
+  const perf = ((data.performance?.[perfMode] ?? []) as any[]).filter(
+    (p) => perfMode !== "monthly" || p.period >= PERFORMANCE_FROM
+  );
   const benchmark = (data.benchmark ?? []) as any[];
   const risk = data.risk as any;
 
@@ -127,6 +134,7 @@ export default function Page() {
   const deposits = (s.cashflowByMonth as any[])
     .filter((m) => m.month >= DEPOSITS_FROM)
     .map((m) => ({ month: m.month, deposits: m.deposits }));
+  const avgMonthlyDeposit = deposits.length ? deposits.reduce((sum, d) => sum + d.deposits, 0) / deposits.length : 0;
 
   const dividendRows = (s.dividendByMonth as any[]).filter((r) => r.month >= DIVIDENDS_FROM);
 
@@ -330,6 +338,15 @@ export default function Page() {
           )}
         </Section>
         <Section title="Vklady" subtitle="Měsíční vklady od 10/2024 (CZK)">
+          {deposits.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 mb-4">
+              <MiniStat
+                label="Průměrný vklad / měsíc"
+                value={czk(avgMonthlyDeposit)}
+                hint="Součet vkladů od 10/2024 vydělený počtem měsíců v tomto období (vč. měsíců bez vkladu)."
+              />
+            </div>
+          )}
           {deposits.length ? <DepositsChart data={deposits} /> : <Empty msg="Žádné vklady v tomto období." />}
         </Section>
       </div>
