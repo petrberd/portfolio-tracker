@@ -82,10 +82,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Fixed 12-month window starting at the current month (e.g. 2026-07).
+  // Fixed 12-month window starting NEXT month (e.g. run in 2026-07 → window 2026-08..2027-07).
+  // The current month is skipped since it's typically already (partly) in the past.
   const now = new Date();
   const monthKeys: string[] = [];
-  for (let i = 0; i < 12; i++) {
+  for (let i = 1; i <= 12; i++) {
     monthKeys.push(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + i, 1)).toISOString().slice(0, 7));
   }
   const windowSet = new Set(monthKeys);
@@ -126,12 +127,37 @@ export async function GET(req: NextRequest) {
   const dividendCzk = inWindow.filter((p) => p.kind === "dividend").reduce((s, p) => s + p.incomeCzk, 0);
   const interestCzk = inWindow.filter((p) => p.kind === "interest").reduce((s, p) => s + p.incomeCzk, 0);
 
+  // Per-source breakdown (stacked by ticker/account) for the projection chart,
+  // same shape as the "Dividendy v čase" stacked chart (month + one key per source).
+  const totalsBySource = new Map<string, number>();
+  const instrumentBySource = new Map<string, string>();
+  for (const p of inWindow) {
+    totalsBySource.set(p.ticker, (totalsBySource.get(p.ticker) ?? 0) + p.incomeCzk);
+    instrumentBySource.set(p.ticker, p.instrument);
+  }
+  const TOP = 8;
+  const rankedSources = [...totalsBySource.entries()].sort((a, b) => b[1] - a[1]);
+  const topSources = rankedSources.slice(0, TOP).map(([t]) => t);
+  const isTopSource = new Set(topSources);
+  const byMonthMapPerSource = new Map<string, Map<string, number>>(monthKeys.map((m) => [m, new Map()]));
+  for (const p of inWindow) {
+    const month = p.payDate.slice(0, 7);
+    const key = isTopSource.has(p.ticker) ? p.ticker : "__other";
+    const m = byMonthMapPerSource.get(month)!;
+    m.set(key, (m.get(key) ?? 0) + p.incomeCzk);
+  }
+  const byMonthBreakdown = monthKeys.map((month) => ({ month, ...Object.fromEntries(byMonthMapPerSource.get(month)!) }));
+  const incomeSources = topSources.map((t) => ({ ticker: t, instrument: instrumentBySource.get(t) ?? t }));
+  if (rankedSources.length > TOP) incomeSources.push({ ticker: "__other", instrument: "Ostatní" });
+
   return NextResponse.json({
     available: true,
     annualIncomeCzk,
     dividendCzk,
     interestCzk,
     byMonth,
+    byMonthBreakdown,
+    incomeSources,
     payments: inWindow,
     windowStart: startMonth,
     payers: new Set(inWindow.map((p) => p.ticker)).size,

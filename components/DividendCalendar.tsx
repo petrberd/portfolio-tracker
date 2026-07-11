@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IncomeChart } from "@/components/Charts";
+import { DividendStackedChart } from "@/components/Charts";
 import { InfoTip } from "@/components/InfoTip";
 import { czk } from "@/lib/format";
 
@@ -40,7 +40,7 @@ export function DividendCalendar() {
         <Stat label="z toho úroky (netto)" value={czk(d.interestCzk ?? 0)} hint="Část projekce z úroků spořicích účtů, netto po 15% srážkové dani." />
       </div>
 
-      <IncomeChart data={d.byMonth} />
+      <DividendStackedChart data={d.byMonthBreakdown} tickers={d.incomeSources} />
 
       <div className="mt-4 overflow-x-auto">
         <div className="stat-label mb-2">Nejbližší platby</div>

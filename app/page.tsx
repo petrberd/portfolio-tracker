@@ -147,12 +147,14 @@ export default function Page() {
 
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <Kpi
-          label="Volná hotovost"
-          value={czk(s.freeCash ?? 0)}
-          sub={(s.cashAccounts ?? []).map((a: any) => a.name).join(" + ") || undefined}
-          hint="Hotovost na spořicích účtech mimo XTB. Nastavuje se v data/cash.json."
-        />
+        {(s.cashAccounts ?? []).length > 0 && (
+          <Kpi
+            label="Volná hotovost"
+            value={czk(s.freeCash ?? 0)}
+            sub={(s.cashAccounts ?? []).map((a: any) => a.name).join(" + ") || undefined}
+            hint="Hotovost na spořicích účtech mimo XTB. Nastavuje se v data/cash.json."
+          />
+        )}
         <Kpi
           label="Tržní hodnota"
           value={czk(s.totalMarketValue + (s.xtbCash ?? 0))}

@@ -220,24 +220,4 @@ export function DepositsChart({ data }: { data: { month: string; deposits: numbe
 }
 
 /** Projected dividend income per month (CZK). */
-export function IncomeChart({ data }: { data: { month: string; income: number }[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={data} margin={{ top: 10, right: 8, left: 8, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#1b2438" vertical={false} />
-        <XAxis dataKey="month" tick={axisStyle} minTickGap={12} tickFormatter={monthLabel} />
-        <YAxis tick={axisStyle} width={52} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-        <Tooltip
-          contentStyle={tooltipStyle}
-          itemStyle={tipItem}
-          labelStyle={tipLabel}
-          labelFormatter={monthLabel}
-          formatter={(v: number) => [czk(v), "Očekávaný příjem"]}
-        />
-        <Bar dataKey="income" fill="#22c55e" radius={[3, 3, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
 export { PALETTE };
