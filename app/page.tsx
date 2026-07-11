@@ -12,6 +12,7 @@ import {
   PALETTE,
 } from "@/components/Charts";
 import { AnalystPanel } from "@/components/Analysts";
+import { EarningsCalendar } from "@/components/EarningsCalendar";
 import { MarketMood } from "@/components/MarketMood";
 import { StockDetail } from "@/components/StockDetail";
 import { DividendCalendar } from "@/components/DividendCalendar";
@@ -343,6 +344,17 @@ export default function Page() {
       {/* Analyst forecasts & ratings */}
       <div className="mt-6">
         <AnalystPanel holdings={holdings.map((h) => ({ symbol: h.symbol, instrument: h.instrument }))} refreshTick={refreshTick} />
+      </div>
+
+      {/* Earnings calendar */}
+      <div className="mt-6">
+        <Section
+          title="Earnings kalendář"
+          subtitle="Nejbližší termín výsledků pro každý titul v portfoliu"
+          hint="Kde stockanalysis.com uvádí datum v budoucnosti, bereme ho přímo. Kde je poslední známé datum už v minulosti (web ho ještě nestihl posunout), appka ho odhadne o ~91 dní dopředu a označí (odhad)."
+        >
+          <EarningsCalendar refreshTick={refreshTick} />
+        </Section>
       </div>
 
       {/* Dividends + deposits */}
