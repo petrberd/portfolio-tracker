@@ -68,54 +68,99 @@ reálné riziko je zanedbatelné.
 
 > Data se na Netlify **nedeployují** (`data/` je gitignored). Portfolio nahraješ na živém webu.
 
-## Co appka umí (MVP)
+## Co appka umí
 
+### Portfolio a výkonnost
 - **Hodnota portfolia v čase** — denní celková hodnota (akcie + hotovost) vs. čistě
-  investovaný kapitál. Rozdíl mezi křivkami = celkový výnos.
-- **Výkonnost portfolia** — zisk/ztráta v Kč za období (přepínač měsíce/roky) plus
-  výnos v % jako **TWR** (time-weighted return) — nezávislý na načasování a velikosti vkladů.
+  investovaný kapitál. Rozdíl mezi křivkami = celkový výnos. Ceny i FX kurzy se přepočítávají
+  **dobovým kurzem** platným ten den, ne dnešním — historie tak nemíchá cenový a měnový efekt.
+- **Výkonnost portfolia** — zisk/ztráta v Kč za měsíc/rok (přepínač) plus výnos v % jako
+  **TWR** (time-weighted return) — nezávislý na načasování a velikosti vkladů. Start grafu
+  (i dividend, vkladů) se odvozuje automaticky od prvního obchodu na účtu, ne z natvrdo
+  zadaného data — funguje i pro účet s jinou historií.
 - **Zisk/ztráta** — nerealizovaný (živé ceny) i realizovaný P/L, výnos v %.
-- **Alokace** — rozložení podle tržní hodnoty pozic.
-- **Dividendy** — přijaté dividendy po měsících, skládané podle titulu, který se na výnosu podílel.
-- **Vklady** — měsíční vklady od 10/2024.
-- **Analytické odhady** — 12měsíční cílová cena a rozpad doporučení (silný nákup / nákup /
-  držet / prodej / silný prodej) na vybraný titul, plus potenciál vs. aktuální cena.
+- **Volná hotovost** — spořicí účty mimo XTB (`data/cash.json` lokálně / `CASH_CONFIG_JSON`
+  na Netlify), oddělená KPI od hotovosti přímo na XTB účtu. Dlaždice se schová, když žádné
+  externí účty nejsou nastavené.
+- **Alokace** — přepínač Pozice / Sektory (Finnhub) / Měny.
+- **Vklady** — měsíční vklady + průměrný vklad za měsíc.
+- **Výkonnost vs. trh** — portfolio (TWR) vs. **S&P 500 Total Return** (`^SP500TR`, vč.
+  reinvestovaných dividend — fér srovnání proti portfoliu, které dividendy taky počítá do
+  výkonnosti) + rizikové metriky (roční výnos, volatilita, max. pokles, Sharpe ratio).
+- **Nálada trhu** — VIX (index očekávané volatility S&P 500, „index strachu") s gaugem
+  a klasifikací klid/nervozita/strach/panika.
+
+### Titul v detailu
+- **Analytické odhady** — rozpad doporučení (silný nákup … silný prodej) + gauge „Férová
+  cena" (odhad analytiků vs. aktuální cena, barevná škála podhodnoceno → nadhodnoceno).
   Data z stockanalysis.com. Ne investiční doporučení.
 - **Detail titulu** — klik na pozici otevře modal: 2letý cenový graf s tvými nákupy/prodeji,
   klíčové fundamenty (tržní kap., P/E, tržby, marže), analytici, **insider obchody** (Finnhub)
   a **newsfeed** (Yahoo RSS).
-- **Výkonnost vs. trh** — portfolio (TWR) vs. S&P 500 (rebased na 100) + rizikové metriky
-  (roční výnos, volatilita, max. pokles, Sharpe).
-- **Alokace** — přepínač Pozice / Sektory (Finnhub) / Měny.
-- **Dividendový výhled** — příjem za 12 měsíců, yield-on-cost, dividendový výnos.
-- **Dividendová projekce** — očekávaný příjem na 12 měsíců z aktuálních pozic, měsíční graf
-  a kalendář ex-dividend / výplat. Data z Nasdaqu (reálné ex+pay date) s fallbackem na Yahoo
-  (ex-daty + odhad pay date). Ex/pay date jsou i v detailu titulu.
+- **Earnings kalendář** — nejbližší termín výsledků pro každý titul v portfoliu
+  (stockanalysis.com); pokud je poslední známé datum už v minulosti, appka ho odhadne
+  o ~91 dní dopředu (typická čtvrtletní kadence) a označí „(odhad)".
+- **Dividendová projekce** — očekávaný příjem na 12 měsíců z aktuálních pozic (podle počtu
+  kusů k ex-dni, ne dnešního), rozpad po titulech/účtech, a kalendář ex-dividend/výplat.
+  Ex/pay date z Nasdaqu (reálné, jen Nasdaq-listed) → fallback stockanalysis.com (taky reálné
+  datum, i pro NYSE) → fallback Yahoo (ex-datum reálné, pay datum odhad).
+- **Daňový přehled** — časový test (§4/1/w ZDP): po jednotlivých FIFO tranších ukáže, kolik
+  kusů je už přes 3 roky osvobozeno a kdy se osvobodí další tranše; plus roční hodnotový
+  limit 100 000 Kč (hrubý příjem z prodeje CP za kalendářní rok). Orientační výpočet, ne
+  daňové poradenství.
 
-Insider obchody a sektory vyžadují **Finnhub API klíč** v `.env.local` (`FINNHUB_API_KEY`);
-free tier stačí. Institucionální držba a cílové ceny jsou jen v placeném tieru — vynechány.
+### Smart Money
+- **Sleduj obchody super investorů a insiderů** — 13F filings (Warren Buffett/Berkshire,
+  Bill Ackman/Pershing Square, Michael Burry/Scion) diffnuté mezi posledními dvěma čtvrtletími
+  (nové/navýšené/snížené/uzavřené pozice) + Form 4 insider obchody (Jensen Huang, Elon Musk,
+  Mark Zuckerberg) — jen skutečné nákupy/prodeje na volném trhu, ne granty/daňové odvody.
+  Vše zdarma přes SEC EDGAR. 13F má zpoždění až 45 dní a chybí bezplatné CUSIP→ticker
+  mapování (pozice se zobrazují podle názvu firmy). Politici (STOCK Act) vynechání — bezplatné
+  zdroje jsou nedostupné a oficiální portály nemají REST API.
 
-Tlačítko **Obnovit ceny** obchází cache a stáhne aktuální ceny; denní změna se počítá
-z živé ceny (`regularMarketPrice`) proti poslednímu uzavřenému dennímu close.
+Insider obchody a sektory (v detailu titulu) vyžadují **Finnhub API klíč** v `.env.local`
+(`FINNHUB_API_KEY`); free tier stačí. Institucionální držba a cílové ceny (Finnhub) jsou jen
+v placeném tieru — vynechány.
+
+Tlačítko **Obnovit ceny** obchází cache a stáhne aktuální ceny; appka se navíc sama obnovuje
+každých 5 minut. Denní změna se počítá z živé ceny (`regularMarketPrice`) proti poslednímu
+uzavřenému dennímu close.
 
 ## Jak to počítá
 
 - **Import** (`lib/parseXtb.ts`) — čte listy *Cash Operations* a *Closed Positions*.
   Počet kusů a cenu tahá z komentářů (`OPEN BUY 0.0709 @ 994.00`).
 - **Pozice** (`lib/positions.ts`) — FIFO rekonstrukce z nákupů a prodejů (výchozí účetní
-  metoda XTB). Zbývající loty = aktuálně držené portfolio; cost basis je v CZK.
+  metoda XTB). Zbývající loty = aktuálně držené portfolio (vč. data nákupu pro časový test);
+  cost basis je v CZK. Počítá i roční hrubý příjem z prodejů (`taxYearSoldCzk`).
 - **Ceny** (`lib/prices.ts`) — přímé volání veřejného Yahoo Finance chart endpointu
   (`query1`, bez API klíče). Jeden dotaz na titul dá měnu, aktuální cenu i historii.
-  Kurzy CZK přes páry typu `USDCZK=X`. Ceny se cachují 6 h do `data/prices.json`.
-- **Časová řada** (`lib/timeseries.ts`) — denní počty kusů × historické close × FX → hodnota v CZK.
+  Ceny se cachují 1 h do `data/prices.json` (tlačítko „Obnovit ceny" cache obchází).
+- **Časová řada** (`lib/timeseries.ts`) — denní počty kusů × historické close × **dobový**
+  FX kurz (ne dnešní) → hodnota v CZK. Benchmark vs. S&P 500 Total Return volí nejmenší
+  dostatečný rozsah historie (1y/2y/5y/10y), aby se u staršího účtu tiše neuseknul.
+- **Daňový časový test** (`lib/taxtest.ts`) — čistě výpočetní, žádné externí volání: exemptDate
+  = nákup + 3 roky + 1 den, po jednotlivých FIFO tranších.
+- **Dividendový kalendář** (`lib/divcalendar.ts`) — ex/pay date + frekvence per titul,
+  s fallback řetězcem Nasdaq → stockanalysis.com → Yahoo (viz výše).
+- **Earnings** (`lib/earnings.ts`) a **analytici** (`lib/analysts.ts`) — stockanalysis.com,
+  SvelteKit „devalue" formát (`__data.json`), stejný parsing pattern v obou modulech.
+- **Smart Money** (`lib/thirteenF.ts`, `lib/secInsiders.ts`, `lib/secEdgar.ts`) — SEC EDGAR
+  (`data.sec.gov` + `www.sec.gov/Archives`), XML parsováno přes `fast-xml-parser`. Vyžaduje
+  identifikující `User-Agent` hlavičku (SEC blokuje anonymní boty), viz `lib/secEdgar.ts`.
 
 ## Data
 
-- `data/export.json` — poslední naimportovaný export.
-- `data/prices.json` — cache cen (smaž pro vynucené stažení).
+Lokálně v `data/` (gitignored), na Netlify přes Netlify Blobs (`lib/storage.ts`):
+
+- `export.json` — poslední naimportovaný export.
+- `prices.json`, `fundamentals.json`, `analysts.json`, `finnhub.json`, `divcal.json`,
+  `earnings.json`, `13f.json`, `insiders.json` — cache jednotlivých datových zdrojů
+  (smaž pro vynucené stažení; TTL se liší modul od modulu, viz komentáře v `lib/`).
+- `cash.json` — externí spořicí účty (volitelné, `.env.example`/README výše).
 
 Vše zůstává lokálně, nic se nikam neposílá. Jen pro osobní přehled — není to investiční poradenství.
 
 ## Technologie
 
-Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind CSS.
+Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · fast-xml-parser · Tailwind CSS.
