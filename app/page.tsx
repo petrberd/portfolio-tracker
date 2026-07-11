@@ -491,7 +491,7 @@ function HoldingsTable({
           <tr className="text-muted text-xs uppercase tracking-wide border-b border-line">
             <th className="text-left font-medium py-2">Titul</th>
             <th className="hidden sm:table-cell text-right font-medium py-2">Kusů</th>
-            <th className="hidden sm:table-cell text-right font-medium py-2">Cena</th>
+            <th className="hidden sm:table-cell text-right font-medium py-2">Aktuální cena</th>
             <th className="text-right font-medium py-2">Hodnota</th>
             <th className="text-right font-medium py-2">Zisk</th>
             <th className="hidden sm:table-cell text-right font-medium py-2">Podíl</th>
@@ -513,7 +513,12 @@ function HoldingsTable({
                   </div>
                 </div>
               </td>
-              <td className="hidden sm:table-cell text-right tabular-nums">{num(h.shares, 4)}</td>
+              <td className="hidden sm:table-cell text-right tabular-nums">
+                {num(h.shares, 4)}
+                <div className="text-muted text-xs">
+                  {h.avgNativePrice ? `⌀ ${num(h.avgNativePrice)} ${h.currency}` : "—"}
+                </div>
+              </td>
               <td className="hidden sm:table-cell text-right tabular-nums">
                 {h.livePrice ? `${num(h.livePrice)} ${h.currency}` : "—"}
                 {h.dayChangePercent ? (
