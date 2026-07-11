@@ -1,8 +1,10 @@
 # Portfolio Tracker — kontext pro Claude
 
-Lokální webová appka na sledování akciového portfolia z XTB (po vzoru Alocano/Stonkee).
-Uživatel naimportuje Excel export z XTB, appka zrekonstruuje pozice a spočítá výkonnost,
-alokaci, dividendy, analytické odhady a detail titulu. Vše běží lokálně, data zůstávají u uživatele.
+Lokální webová appka na sledování investičního portfolia z **XTB a/nebo Revolutu**
+(po vzoru Alocano/Stonkee). Uživatel naimportuje export z brokera(ů), appka zrekonstruuje
+pozice a spočítá výkonnost, alokaci, dividendy, analytické odhady, daňový časový test,
+earnings kalendář a náladu trhu (VIX). Oba brokery lze mít nahrané současně — appka je
+sloučí do jednoho portfolia. Vše běží lokálně, data zůstávají u uživatele.
 
 ## Spuštění
 ```bash
@@ -10,8 +12,12 @@ npm install
 cp .env.example .env.local   # volitelně doplnit FINNHUB_API_KEY
 npm run dev                  # http://localhost:3210
 ```
-Při prvním otevření (bez dat) appka ukáže obrazovku pro nahrání XTB exportu (.xlsx).
-Auto-import: pokud leží `CZK_*.xlsx` v nadřazené složce, načte se sám (viz `app/api/import`).
+Při prvním otevření (bez dat) appka ukáže obrazovku pro nahrání exportu — **XTB** (.xlsx)
+a/nebo **Revolut** (.csv), oddělená tlačítka. Auto-import: pokud leží `CZK_*.xlsx` v nadřazené
+složce, XTB export se načte sám (jen v `NODE_ENV!==production`, viz `app/api/import`).
+
+**Basic Auth se lokálně nevynucuje** (jen na produkci/Netlify) — `npm run dev` běží vždy bez
+hesla, není potřeba nic zadávat při testování.
 
 ## Stack
 Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind. Port 3210.
@@ -22,52 +28,92 @@ Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind.
 - `lib/parseRevolut.ts` — parsuje Revolut Stocks CSV export do stejného `CashOp[]` tvaru jako XTB.
   Peněžní pole mají měnu jako textový prefix (`"EUR 150"`); do CZK přes Revolutem uváděný `FX Rate`
   u každé transakce (`CZK = částka / FX Rate`, ověřeno na reálných datech).
-- `lib/positions.ts` — **FIFO** rekonstrukce pozic z cash operations, cost basis v CZK, realizovaný
-  P/L, dividendy (vč. rozpadu po měsících a titulech).
-- `lib/prices.ts` — ceny z Yahoo. `fetchChart` (range=max, cachováno), `fetchDailyCloses` (denní, pro
-  detailní grafy), `fetchQuote`, `fetchFxCzk`. FX páry `USDCZK=X`.
-- `lib/timeseries.ts` — denní hodnota portfolia (akcie + hotovost) vs. investovaný kapitál;
-  **TWR** (time-weighted return) po měsících/rocích; rizikové metriky (volatilita, max drawdown,
-  Sharpe); benchmark vs S&P 500 (`^GSPC`).
-- `lib/fundamentals.ts` — fundamenty (EPS, tržby, FCF, EBITDA…) z Yahoo `fundamentals-timeseries`.
-- `lib/analysts.ts` — cílová cena + rating z stockanalysis.com.
-- `lib/finnhub.ts` — sektor (`profile2`) + insider obchody (`insider-transactions`). Vyžaduje klíč.
-- `lib/news.ts` — novinky z Yahoo RSS.
-- `lib/divcalendar.ts` — dividendový kalendář (frekvence, částka, ex/pay date) z Nasdaqu (fallback Yahoo)
-  a projekce plateb na 12 měsíců.
 - `lib/store.ts` — persistence per broker (`data/export.json` pro XTB, `data/export-revolut.json`
   pro Revolut); `loadExport()` obě sloučí do jednoho portfolia (concat + sort `cashOps`), takže
   všechny downstream routy fungují beze změny bez ohledu na to, kolik brokerů je nahraných.
-- API routy: `app/api/{import,portfolio,valuation?,analysts,stockdetail,dividends}` — čtou libs, cachují do `data/*.json`.
-- UI: `app/page.tsx` (dashboard) + `components/` (Charts, Analysts, StockDetail, DividendCalendar).
+- `lib/positions.ts` — **FIFO** rekonstrukce pozic z cash operations, cost basis v CZK, realizovaný
+  P/L, dividendy (vč. rozpadu po měsících a titulech). Uchovává i jednotlivé FIFO loty s datem nákupu
+  (pro daňový časový test) a roční hrubý příjem z prodejů (`taxYearSoldCzk`).
+- `lib/taxtest.ts` — časový test (§4/1/w ZDP): exemptDate = nákup + 3 roky + 1 den, po FIFO tranších.
+  Čistě výpočetní, žádné externí volání.
+- `lib/prices.ts` — ceny z Yahoo. `fetchChart` (range=max, cachováno 1h), `fetchDailyCloses` (denní,
+  pro detailní grafy i pro skutečnou denní % změnu), `fetchQuote`, `fetchFxCzk`. FX páry `USDCZK=X`.
+  **Symbol resolution:** když holý ticker (Revolut bez burzovní přípony, nebo XTB burza mimo
+  `yahooSymbol()`'s allowlist) nemá na Yahoo data, appka se zeptá Yahoo search API
+  (`/v1/finance/search`) a vezme první fungující výsledek — cachováno natrvalo v `symbolMap.json`.
+- `lib/timeseries.ts` — denní hodnota portfolia (akcie + hotovost) vs. investovaný kapitál;
+  **TWR** (time-weighted return) po měsících/rocích; rizikové metriky (volatilita, max drawdown,
+  Sharpe); benchmark vs **S&P 500 Total Return** (`^SP500TR`, ne cenový `^GSPC` — portfolio taky
+  počítá dividendy do výkonnosti, takže cenový index by srovnání zkresloval). FX se přepočítává
+  **dobovým kurzem** (viz níže), ne dnešním. Benchmark si sám vybírá nejmenší dostatečný rozsah
+  historie (1y/2y/5y/10y), aby se u staršího účtu neuseknul (Yahoo `range=max` je jen měsíční).
+- `lib/fundamentals.ts` — fundamenty (EPS, tržby, FCF, EBITDA…) z Yahoo `fundamentals-timeseries`.
+- `lib/analysts.ts` — cílová cena + rating z stockanalysis.com (`__data.json`, SvelteKit "devalue"
+  formát — objekty drží indexy do plochého pole).
+- `lib/earnings.ts` — nejbližší termín výsledků ze stockanalysis.com (stejný `__data.json` pattern
+  jako analysts.ts). Když je poslední známé datum v minulosti, promítne se o ~91 dní dopředu
+  a označí „(odhad)".
+- `lib/finnhub.ts` — sektor (`profile2`) + insider obchody (`insider-transactions`). Vyžaduje klíč.
+- `lib/news.ts` — novinky z Yahoo RSS.
+- `lib/divcalendar.ts` — dividendový kalendář (frekvence, částka, ex/pay date) + projekce plateb na
+  12 měsíců (okno od PŘÍŠTÍHO měsíce, ne aktuálního — current month bývá částečně pryč). Fallback
+  řetězec: Nasdaq (reálné, jen Nasdaq-listed) → stockanalysis.com (reálné, i NYSE) → Yahoo
+  (ex reálné, pay odhad).
+- API routy: `app/api/{import,portfolio,analysts,stockdetail,dividends,earnings,market}` — čtou
+  libs, cachují do `data/*.json`.
+- UI: `app/page.tsx` (dashboard) + `components/` (Charts, Analysts, StockDetail, DividendCalendar,
+  EarningsCalendar, MarketMood, Gauge — sdílený semicircle gauge pro Férovou cenu i VIX).
 
 ## Datové zdroje — co odsud funguje a co ne
 Zjištěno empiricky (prostředí blokuje část zdrojů):
 - ✅ **Yahoo `query1` chart** `query1.finance.yahoo.com/v8/finance/chart/<sym>` — ceny, měna, historie,
-  `&events=div` pro dividendy. `range=max` vrací MĚSÍČNÍ data → na denní použij `range=2y`.
+  `&events=div` pro dividendy. `range=max` vrací MĚSÍČNÍ data → na denní použij explicitní rozsah
+  (`1y`/`2y`/`5d` apod. — cokoliv jiného než `max` dá denní granularitu).
+- ✅ **Yahoo `/v1/finance/search`** — vyhledávání/autocomplete tickerů, funguje bez crumbu. Používá se
+  jako univerzální fallback při dohledání Yahoo symbolu (viz `lib/prices.ts`).
 - ✅ **Yahoo `fundamentals-timeseries`** — roční fundamenty, bez crumbu.
-- ✅ **stockanalysis.com** `/api/symbol/s/<US-TICKER>/overview` — analytici (rating, cíl, rozpad). Jen US.
+- ✅ **stockanalysis.com** `/stocks/<ticker>/__data.json` — analytici, earnings date, dividend historie
+  (ex+pay date, i NYSE). US-centrické, u evropských tickerů většinou nedostupné.
 - ✅ **Nasdaq** `api.nasdaq.com/api/quote/<sym>/dividends?assetclass=stocks` — reálné ex+pay date, ale jen
-  **Nasdaq-listed** (NYSE jako VICI/MO vrací prázdno → fallback na Yahoo ex-daty + odhad pay date).
+  **Nasdaq-listed** (NYSE jako VICI/MO vrací prázdno → fallback stockanalysis.com/Yahoo).
 - ✅ **Yahoo RSS** `feeds.finance.yahoo.com/rss/2.0/headline?s=<sym>` — novinky.
-- ✅ **Finnhub free** — `profile2` (sektor) + `insider-transactions`. Klíč v `.env.local`.
+- ✅ **Finnhub free** — `profile2` (sektor) + `insider-transactions`. Klíč v `.env.local`. US-centrické.
 - ❌ **Blokované / placené:** Yahoo `query2` a `quoteSummary` (crumb → 401), Stooq (anti-bot), Finnhub
   `institutional-ownership` a `price-target` (placené). Proto se institucionální držba nedělá.
+- ❌ **SEC EDGAR** (13F filings, Form 4 insider) — fungovalo (zkusili jsme "Smart Money" sekci: Buffett/
+  Ackman/Burry 13F + Huang/Musk/Zuckerberg Form 4), ale nakonec **odebráno** — layout byl moc rozsáhlý
+  na přínos pro tenhle use case. Kód smazán (`lib/secEdgar.ts`, `lib/thirteenF.ts`, `lib/secInsiders.ts`),
+  vyžaduje popisný `User-Agent` header (SEC blokuje anonymní boty).
+- ❌ **CNN Fear & Greed** — jejich endpoint vrací `418 I'm a teapot` (blokuje boty). Použit VIX (`^VIX`
+  přes Yahoo chart) jako "index strachu" místo toho.
+- ❌ **Senate/House Stock Watcher** (politici, STOCK Act) — bezplatné S3 JSON feedy jsou teď nedostupné
+  (403/timeout), oficiální porty nemají REST API. Nezkoušet znovu bez nového zdroje dat.
 
 ## Klíčová výpočetní rozhodnutí
 - **Hodnota portfolia** v grafu = tržní hodnota akcií; ale výkonnost (TWR) počítá z **celkové hodnoty
   vč. hotovosti**, aby přesuny cash↔akcie nevypadaly jako zisk a dividendy/úroky se započítaly.
 - **Výnos %** = TWR (nezávislý na načasování vkladů), ne prosté (hodnota/vklady).
-- **Dividendová projekce** bere počet akcií **k ex-dividend dni** (historicky rekonstruováno), ne dnešní —
-  akcie koupené po ex-date na tu dividendu nárok nemají. Okno = 12 měsíců od začátku aktuálního měsíce.
-- **Známé zjednodušení:** historické hodnoty se přepočítávají DNEŠNÍM FX kurzem (ne historickým) — zkresluje
-  to historické CZK hodnoty a míchá cenový vs měnový efekt. Kandidát na opravu (historický FX / přepínač CZK/USD).
+- **Dividendová projekce** bere počet akcií **k ex-dividend dni** (historicky rekonstruováno), ne
+  dnešní — akcie koupené po ex-date na tu dividendu nárok nemají. Okno = 12 měsíců od PŘÍŠTÍHO měsíce.
+- **Historický FX kurz** (OPRAVENO) — hodnota portfolia v čase se přepočítává dobovým FX kurzem
+  platným ten den, ne dnešním (dřív to mísilo cenový a měnový efekt).
+- **Denní % změna** (OPRAVENO) — dřív se počítala z `chart.closes` (měsíční granularita `range=max`),
+  takže to bylo ve skutečnosti meziměsíční srovnání, ne denní. Teď se počítá ze skutečných denních dat
+  (`fetchDailyCloses`), postihovalo to všechny pozice i VIX.
+- **Daňový časový test** — orientační, ne daňové poradenství. Neřeší rozšířený test pro velké majetky
+  (~40 mil. Kč) zavedený 2025 (portfolio této velikosti se do toho nedostane).
+- **Fair Price / VIX gauge** — sdílená `SemiGauge` komponenta (`components/Gauge.tsx`). Fair Price je
+  zrcadlově obrácený (podhodnoceno vpravo — tak to vyšlo přirozeně z rostoucí hodnoty `upsidePct`);
+  VIX gauge je zrcadlený EXPLICITNĚ (mirroredValue = min+max-vix + obrácené pořadí barev), protože
+  u VIX je nízká hodnota "dobrá", takže bez zrcadlení by klid vycházel vlevo.
 
 ## Cache & data / persistence
 Perzistence jde přes `lib/storage.ts` (`readJson`/`writeJson`): **lokálně soubory v `data/`**,
 **na Netlify Netlify Blobs** (read-only FS) — přepíná se podle `process.env.NETLIFY`. Klíče:
-`export.json` (import), `prices.json`, `fundamentals.json`, `finnhub.json`, `analysts.json`,
-`divcal.json`, `cash.json`. Lokálně smazáním souboru vynutíš re-fetch; „Obnovit ceny" obchází cache cen.
+`export.json` + `export-revolut.json` (import per broker), `prices.json`, `symbolMap.json`
+(Yahoo symbol resolution, cache navždy), `fundamentals.json`, `finnhub.json`, `analysts.json`,
+`divcal.json`, `earnings.json`, `cash.json`. Lokálně smazáním souboru vynutíš re-fetch;
+„Obnovit ceny" obchází cache cen (a appka se navíc sama obnovuje každých 5 minut).
 Když přidáváš nový cache modul, čti/zapisuj přes `storage.ts`, ne přes `fs` napřímo (jinak spadne na Netlify).
 
 ## Basic auth
@@ -75,7 +121,8 @@ Když přidáváš nový cache modul, čti/zapisuj přes `storage.ts`, ne přes 
 (`NODE_ENV=production`, tj. na Netlify) — lokální `npm run dev` běží vždy bez hesla, aby
 testování appky nevyžadovalo opakované zadávání přihlašovacích údajů. Na produkci se vynucuje
 jen když jsou nastavené `BASIC_AUTH_USER` + `BASIC_AUTH_PASSWORD` (jinak je web otevřený).
-Creds nejsou v repu — lokálně `.env.local`, na Netlify env.
+Creds nejsou v repu — lokálně `.env.local`, na Netlify env. Porovnání hesla je constant-time
+(vlastní implementace — Edge Runtime nemá Node `crypto.timingSafeEqual`).
 
 ## Verzování
 Od v1.0.0 (2026-07-11) se appka verzuje: [Keep a Changelog](https://keepachangelog.com/) formát
@@ -85,26 +132,49 @@ který mění chování appky (feature, fix, odebrání) — ne u čistě dokume
 2. Zvyš `version` v `package.json` (patch = fix, minor = nová featura, major = breaking změna).
 3. Po pushnutí přidej git tag `vX.Y.Z` na ten commit (`git tag vX.Y.Z && git push origin vX.Y.Z`).
 Čistě dokumentační push (jen README/CLAUDE.md) verzi nezvyšuje a nemusí mít changelog záznam.
+Aktuální verze: **1.2.1**. Tagy `v1.1.0`, `v1.2.0`, `v1.2.1` existují jen lokálně — nejsou
+pushnuté na GitHub (jen `v1.0.0` tam je). Až se pushne main, pushni i tagy (`git push origin --tags`).
 
 ## Netlify deploy
 `netlify.toml` + `@netlify/plugin-nextjs`. Env proměnné na Netlify: `BASIC_AUTH_*`, `FINNHUB_API_KEY`,
 volitelně `CASH_CONFIG_JSON` (spořicí účty jako JSON, protože `data/cash.json` se nedeployuje).
-XTB export se na živém webu nahraje ručně (uloží se do Blobs). Build ověříš `npm run build`.
+XTB i Revolut export se na živém webu nahraje ručně (uloží se do Blobs). Build ověříš `npm run build`.
+Commit message `[skip netlify]` zabrání buildu (použij pro čistě dokumentační/metadata pushe).
 
 ## Nápady na pokračování (z PM review, neimplementováno)
-1. **Panel koncentrace/rizika** — TOP1/3/5 váhy, HHI, sektorová koncentrace + flagy (portfolio je hodně
-   koncentrované: TOP5 ~80 %, Real Estate ~43 %, 100 % USD neháhdgeováno).
+1. **Panel koncentrace/rizika** — TOP1/3/5 váhy, HHI, sektorová koncentrace + flagy.
 2. **Headline strip** nahoře — total return %, alfa vs S&P, Sharpe, hlavní rizikový flag.
-3. **Férový benchmark** — S&P total-return index (vč. dividend) místo cenového `^GSPC` + přepínač CZK/USD.
-4. **Atribuce výnosu** — top přispěvatelé / detraktoři.
-5. Oprava FX na historický kurz (viz zjednodušení výše).
+3. **Atribuce výnosu** — top přispěvatelé / detraktoři.
+4. **Přepínač CZK/USD** zobrazení (historický FX už je opravený, tohle by byl další krok).
+5. **Portabilita pro jiného uživatele** (audit proveden, neopraveno — nízká priorita, dokud appku
+   nesdílíš dál): `yahooSymbol()`'s exchange-suffix allowlist je uzavřená (ale teď má Yahoo-search
+   fallback jako záchrannou síť); FX fallback tabulka jen pro pár měn (USD/EUR/GBP/CHF/PLN, jinde
+   default 21 — špatně pro JPY/CAD/AUD apod.).
 
 Vždy nejdřív ověř dostupnost dat (prostředí blokuje zdroje), teprve pak stav feature.
 
+## Preference uživatele (Petr)
+- **Lightweight verification** — u tohohle projektu drž ověřování lehké (curl/API check, tsc, build),
+  ne opakované browser-verify smyčky se screenshoty pro malé/nízkorizikové změny. Petr to explicitně
+  žádal (šetří tokeny). Screenshot tool v tomhle sandboxu navíc často vrací 0×0 rozměry (známý
+  environment bug, ne chyba appky) — nespoléhej se na screenshot jako jediný důkaz, ověřuj přes
+  accessibility tree / curl / DOM inspekci přes `javascript_tool`.
+- **Basic Auth lokálně otravovalo** — proto teď middleware v dev módu vůbec neběží (viz výše).
+- Petr je Head of IT Ops (fintech), appku staví jako osobní nástroj, ne pro širší distribuci (zatím).
+
 ## Aktuální stav (2026-07-11)
 - **Nasazeno:** https://xtb-portfolio-tracker.netlify.app (za basic auth). Repo: github.com/petrberd/portfolio-tracker.
-- **Nepushnuté commity:** lokálně jsou 4 commity před `origin/main` (analysts fix, VICI dar, mobil, XTB cash) — čekají na push (uživatel je pushne až nasbírá víc změn). `git push origin main` je spustí + Netlify auto-deploy.
-- **Analytická data:** stockanalysis.com zrušil starý REST endpoint; teď se čte z `stocks/<ticker>/__data.json` (SvelteKit "devalue" formát — objekty drží indexy do plochého pole; viz `lib/analysts.ts`).
-- **`lib/transfers.ts`:** některé odchody akcií (dar „Send A Gift Transfer Out") jsou jen v Closed Positions, ne v Cash Operations. Detekují se tam a odečítají v positions/timeseries/dividend route (FIFO, bez realizovaného P/L).
-- **XTB volná hotovost (`xtbCash`):** čistý zůstatek všech cash ops; KPI „Tržní hodnota" = akcie + xtbCash. Oddělené od KPI „Volná hotovost" (externí spořicí účty z `cash.json`/`CASH_CONFIG_JSON`).
-- **Mobil:** grid sekce mají `grid-cols-1` základ + `min-w-0` na položkách; `overflow-x:hidden` + `overscroll-behavior-x:none` na html/body (jinak iOS gumové posouvání). Testováno na šířce iPhone 16 Pro (402 px) přes same-origin iframe — prohlížeč v tomto prostředí nejde zúžit pod ~460 px napřímo.
+- **Git stav:** `main` je lokálně **8 commitů před `origin/main`** (nepushnuté) — zahrnují: day-change
+  % fix, VIX gauge/graf vylepšení, layout přeskládání (Earnings pod Alokaci, Smart Money odebráno),
+  Revolut import (parser + merge + UI), univerzální Yahoo symbol resolution, README/CLAUDE.md updaty,
+  verzování v1.1.0 → v1.2.1. Čeká se, až uživatel řekne "push".
+- **Poslední pushnutý commit:** `581b083` ("Trigger Netlify deploy (retry)"). Poslední pushnutý tag: `v1.0.0`.
+- **Revolut import je live-otestovaný** na reálném vzorku uživatele (6 transakcí: CASH TOP-UP, BUY,
+  DIVIDEND) — funguje včetně sloučení s XTB, EUR měny, a nedostupných tickerů (4COP, CEBS = evropské
+  ETF, vyřešeno Yahoo search fallbackem).
+- **`lib/transfers.ts`:** některé odchody akcií (dar „Send A Gift Transfer Out") jsou jen v Closed
+  Positions, ne v Cash Operations. Detekují se tam a odečítají v positions/timeseries/dividend route
+  (FIFO, bez realizovaného P/L).
+- **Mobil:** grid sekce mají `grid-cols-1` základ + `min-w-0` na položkách; `overflow-x:hidden` +
+  `overscroll-behavior-x:none` na html/body (jinak iOS gumové posouvání). Testováno na šířce iPhone
+  16 Pro (402 px) přes same-origin iframe.
