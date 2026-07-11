@@ -31,6 +31,29 @@ BASIC_AUTH_PASSWORD=...
 Když jsou obě vyplněné, celý web (i API) se schová za přihlašovací dialog (HTTP Basic Auth,
 řeší `middleware.ts`). Když jsou prázdné, web je bez hesla.
 
+## Security review (2026-07-11)
+
+Proběhla bezpečnostní kontrola zaměřená hlavně na to, jestli se dá ze stránky získat cokoliv
+bez znalosti Basic Auth hesla. Výsledek: **ne** — `middleware.ts` gatuje úplně vše (stránku
+i všechny API routy) kromě staticky kompilovaných Next.js assetů (`_next/static`, `_next/image`,
+`favicon.ico`), které žádná data neobsahují. Aplikace navíc není staticky exportovaná, takže
+žádná data nejsou "zapečená" v buildu.
+
+Nalezené a opravené drobnosti:
+- Porovnání Basic Auth hesla bylo přes `===`, což teoreticky umožňuje timing útok — nahrazeno
+  vlastním constant-time porovnáním (Edge Runtime nemá Node `crypto.timingSafeEqual`).
+- Chybové hlášky z importu (`/api/import`) se vracely klientovi včetně detailu výjimky —
+  teď jde jen obecná zpráva, detail se loguje jen na serveru.
+- Lokální auto-import endpoint (`GET /api/import`, čte soubor z nadřazené složky) je teď
+  explicitně vypnutý mimo `NODE_ENV=development`, aby nezávisel jen na tom, že na Netlify
+  je nadřazená složka prázdná.
+
+Známé, vědomě přijaté riziko: knihovna `xlsx` (SheetJS) má na npm neopravené CVE
+(prototype pollution, ReDoS) — oficiální fix existuje jen na vlastním CDN SheetJS, ne na npm,
+takže by šlo o závislost mimo běžný registry. Zneužitelné jen nahráním škodlivého `.xlsx`
+přes `/api/import`, což je endpoint jen pro jednoho důvěryhodného uživatele za Basic Authem —
+reálné riziko je zanedbatelné.
+
 ## Nasazení na Netlify
 
 1. Nahraj repo na GitHub a v Netlify dej **Add new site → Import from Git**.

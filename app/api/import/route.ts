@@ -28,15 +28,22 @@ export async function POST(req: NextRequest) {
       closedPositions: parsed.closedPositions.length,
     });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Import selhal." }, { status: 500 });
+    console.error("Import failed", e);
+    return NextResponse.json({ error: "Import selhal. Zkontroluj, že je soubor platný XTB export." }, { status: 500 });
   }
 }
 
 /**
  * Convenience GET: auto-import an XTB export sitting next to the project
  * (the parent working directory) if the user hasn't uploaded one yet.
+ * Local-dev only — on Netlify the parent directory is an ephemeral build
+ * folder with no export file, so this is a no-op there anyway; the guard
+ * just makes that explicit instead of relying on the empty directory.
  */
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Auto-import je dostupný jen lokálně." }, { status: 404 });
+  }
   try {
     const parentDir = path.resolve(process.cwd(), "..");
     const entries = await fs.readdir(parentDir);
@@ -54,6 +61,7 @@ export async function GET() {
       closedPositions: parsed.closedPositions.length,
     });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Auto-import selhal." }, { status: 500 });
+    console.error("Auto-import failed", e);
+    return NextResponse.json({ error: "Auto-import selhal." }, { status: 500 });
   }
 }
