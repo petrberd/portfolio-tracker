@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
+ * Constant-time string comparison (Edge Runtime has no Node `crypto.timingSafeEqual`).
+ * Always scans the full length of both inputs so a wrong guess doesn't return faster
+ * for a longer common prefix.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  const len = Math.max(a.length, b.length, 1);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
+/**
  * HTTP Basic Auth over the whole site. Active only when BASIC_AUTH_USER and
  * BASIC_AUTH_PASSWORD are set (locally in .env.local, on Netlify as env vars),
  * so the credentials never live in the repo. If unset, the app is open.
@@ -15,7 +29,9 @@ export function middleware(req: NextRequest) {
     try {
       const decoded = atob(header.slice(6));
       const sep = decoded.indexOf(":");
-      if (decoded.slice(0, sep) === user && decoded.slice(sep + 1) === pass) {
+      const gotUser = decoded.slice(0, sep);
+      const gotPass = decoded.slice(sep + 1);
+      if (timingSafeEqual(gotUser, user) && timingSafeEqual(gotPass, pass)) {
         return NextResponse.next();
       }
     } catch {
