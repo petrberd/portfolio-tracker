@@ -11,6 +11,7 @@ import {
   Line,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -88,6 +89,40 @@ export function ValueChart({ data }: { data: { date: string; market: number; cos
         <Legend wrapperStyle={{ fontSize: 12, paddingTop: 6 }} formatter={legendText} />
         <Area type="monotone" dataKey="market" stroke="#5b8cff" strokeWidth={2} fill="url(#valGrad)" name="Tržní hodnota" />
         <Line type="monotone" dataKey="costBasis" stroke="#f59e0b" strokeWidth={2.5} dot={false} name="Pořizovací cena" />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** VIX history (~6 months) with the same calm/nervous/fear/panic band thresholds as the gauge. */
+export function VixChart({ data }: { data: { date: string; vix: number }[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <ComposedChart data={data} margin={{ top: 10, right: 8, left: 8, bottom: 0 }}>
+        <defs>
+          <linearGradient id="vixGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1b2438" vertical={false} />
+        <XAxis
+          dataKey="date"
+          tick={axisStyle}
+          minTickGap={48}
+          tickFormatter={(d) => new Date(d).toLocaleDateString("cs-CZ", { day: "numeric", month: "short" })}
+        />
+        <YAxis tick={axisStyle} width={32} domain={[0, "auto"]} />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          itemStyle={tipItem}
+          labelStyle={tipLabel}
+          labelFormatter={(d) => shortDate(d as string)}
+          formatter={(v: number) => [v.toFixed(1), "VIX"]}
+        />
+        <ReferenceLine y={20} stroke="#8b98b8" strokeDasharray="3 3" />
+        <ReferenceLine y={30} stroke="#8b98b8" strokeDasharray="3 3" />
+        <Area type="monotone" dataKey="vix" stroke="#f59e0b" strokeWidth={2} fill="url(#vixGrad)" dot={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );

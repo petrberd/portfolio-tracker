@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { InfoTip } from "@/components/InfoTip";
 import { SemiGauge } from "@/components/Gauge";
+import { VixChart } from "@/components/Charts";
 
 // VIX level bands — the commonly-cited rule-of-thumb reading of the index, not
 // an official CBOE classification.
@@ -43,23 +44,30 @@ export function MarketMood({ refreshTick = 0 }: { refreshTick?: number }) {
   const level = levelFor(data.vix);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-      <div className="min-w-0">
-        <div className="text-4xl font-semibold">{data.vix.toFixed(1)}</div>
-        {data.changePercent != null && (
-          <div className={`text-sm mt-1 ${data.changePercent >= 0 ? "text-neg" : "text-pos"}`}>
-            {data.changePercent >= 0 ? "+" : ""}
-            {data.changePercent.toFixed(1)} % oproti včerejšímu uzavření
-          </div>
-        )}
-        <span
-          className="inline-block text-xs font-semibold px-2.5 py-1 rounded-lg mt-2"
-          style={{ color: level.color, background: `${level.color}1f` }}
-        >
-          {level.label}
-        </span>
+    <div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center mb-4">
+        <div className="min-w-0">
+          <div className="text-4xl font-semibold">{data.vix.toFixed(1)}</div>
+          {data.changePercent != null && (
+            <div className={`text-sm mt-1 ${data.changePercent >= 0 ? "text-neg" : "text-pos"}`}>
+              {data.changePercent >= 0 ? "+" : ""}
+              {data.changePercent.toFixed(1)} % oproti včerejšímu uzavření
+            </div>
+          )}
+          <span
+            className="inline-block text-xs font-semibold px-2.5 py-1 rounded-lg mt-2"
+            style={{ color: level.color, background: `${level.color}1f` }}
+          >
+            {level.label}
+          </span>
+        </div>
+        <SemiGauge zones={VIX_LEVELS.map((l) => l.color)} value={data.vix} min={VIX_MIN} max={VIX_MAX} />
       </div>
-      <SemiGauge zones={VIX_LEVELS.map((l) => l.color)} value={data.vix} min={VIX_MIN} max={VIX_MAX} />
+      {data.history?.length ? (
+        <VixChart data={data.history} />
+      ) : (
+        <div className="h-[120px] flex items-center justify-center text-muted text-sm">Historie VIX se nepodařilo načíst.</div>
+      )}
     </div>
   );
 }
