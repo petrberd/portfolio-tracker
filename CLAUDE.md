@@ -69,6 +69,15 @@ Když přidáváš nový cache modul, čti/zapisuj přes `storage.ts`, ne přes 
 `middleware.ts` schová celý web za HTTP Basic Auth, když jsou nastavené `BASIC_AUTH_USER` +
 `BASIC_AUTH_PASSWORD` (jinak je web otevřený). Creds nejsou v repu — lokálně `.env.local`, na Netlify env.
 
+## Verzování
+Od v1.0.0 (2026-07-11) se appka verzuje: [Keep a Changelog](https://keepachangelog.com/) formát
+v `CHANGELOG.md` + [SemVer](https://semver.org/) v `package.json`. **Při každém pushi na GitHub**,
+který mění chování appky (feature, fix, odebrání) — ne u čistě dokumentačních změn:
+1. Přidej záznam do `CHANGELOG.md` (Added/Fixed/Changed/Removed) pod novou verzí nahoře.
+2. Zvyš `version` v `package.json` (patch = fix, minor = nová featura, major = breaking změna).
+3. Po pushnutí přidej git tag `vX.Y.Z` na ten commit (`git tag vX.Y.Z && git push origin vX.Y.Z`).
+Čistě dokumentační push (jen README/CLAUDE.md) verzi nezvyšuje a nemusí mít changelog záznam.
+
 ## Netlify deploy
 `netlify.toml` + `@netlify/plugin-nextjs`. Env proměnné na Netlify: `BASIC_AUTH_*`, `FINNHUB_API_KEY`,
 volitelně `CASH_CONFIG_JSON` (spořicí účty jako JSON, protože `data/cash.json` se nedeployuje).
