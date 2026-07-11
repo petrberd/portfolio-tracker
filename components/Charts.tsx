@@ -99,7 +99,7 @@ export function PerformanceChart({ data }: { data: { period: string; gain: numbe
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data} margin={{ top: 10, right: 8, left: 8, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#1b2438" vertical={false} />
-        <XAxis dataKey="period" tick={axisStyle} minTickGap={16} tickFormatter={periodLabel} />
+        <XAxis dataKey="period" tick={axisStyle} interval={0} tickFormatter={periodLabel} />
         <YAxis tick={axisStyle} width={64} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
         <Tooltip
           contentStyle={tooltipStyle}
@@ -112,7 +112,7 @@ export function PerformanceChart({ data }: { data: { period: string; gain: numbe
             return [`${czk(v)}${gp != null ? `  ·  výnos (TWR) ${pct(gp)}` : ""}`, "Zisk"];
           }}
         />
-        <Bar dataKey="gain" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+        <Bar dataKey="gain" radius={[3, 3, 0, 0]} isAnimationActive={false} minPointSize={3}>
           {data.map((d, i) => (
             <Cell key={i} fill={d.gain >= 0 ? "#22c55e" : "#ef4444"} />
           ))}
