@@ -70,6 +70,8 @@ export function MarketMood({ refreshTick = 0 }: { refreshTick?: number }) {
           value={VIX_MIN + VIX_MAX - data.vix}
           min={VIX_MIN}
           max={VIX_MAX}
+          leftLabel="Panika"
+          rightLabel="Klid"
         />
       </div>
       {data.history?.length ? (

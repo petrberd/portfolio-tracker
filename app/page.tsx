@@ -50,6 +50,7 @@ export default function Page() {
   const [allocMode, setAllocMode] = useState<"pozice" | "sektory" | "meny">("pozice");
   const [detail, setDetail] = useState<{ ticker: string; instrument: string } | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [justRefreshed, setJustRefreshed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const revolutFileRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +68,12 @@ export default function Page() {
         json = await res.json();
       }
       setData(json);
+      // Brief visible confirmation that "Obnovit ceny" actually did something —
+      // otherwise the button just silently reverts to its idle label.
+      if (force) {
+        setJustRefreshed(true);
+        setTimeout(() => setJustRefreshed(false), 2000);
+      }
     } catch (e: any) {
       setError(e?.message ?? "Načtení selhalo.");
     } finally {
@@ -113,14 +120,28 @@ export default function Page() {
 
   if (!data?.imported) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-24 text-center">
-        <h1 className="text-2xl font-semibold mb-2">Portfolio Tracker</h1>
-        <p className="text-muted mb-8">Zatím nemáš naimportovaná data z XTB ani Revolutu.</p>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <UploadButton fileRef={fileRef} onUpload={onUpload} importing={importing} broker="xtb" big />
-          <UploadButton fileRef={revolutFileRef} onUpload={onUpload} importing={importing} broker="revolut" big />
+      <div className="relative max-w-2xl mx-auto px-6 py-24 text-center overflow-hidden">
+        <svg
+          viewBox="0 0 400 120"
+          className="absolute left-1/2 top-8 -translate-x-1/2 w-[420px] max-w-none opacity-[0.07] pointer-events-none"
+          aria-hidden
+        >
+          <path
+            d="M0 100 L40 92 L80 96 L120 70 L160 78 L200 45 L240 55 L280 20 L320 32 L360 8 L400 15"
+            fill="none"
+            stroke="#5b8cff"
+            strokeWidth={3}
+          />
+        </svg>
+        <div className="relative">
+          <h1 className="text-2xl font-semibold mb-2">Portfolio Tracker</h1>
+          <p className="text-muted mb-8">Zatím nemáš naimportovaná data z XTB ani Revolutu.</p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <UploadButton fileRef={fileRef} onUpload={onUpload} importing={importing} broker="xtb" big />
+            <UploadButton fileRef={revolutFileRef} onUpload={onUpload} importing={importing} broker="revolut" big />
+          </div>
+          {error && <p className="text-neg mt-4 text-sm">{error}</p>}
         </div>
-        {error && <p className="text-neg mt-4 text-sm">{error}</p>}
       </div>
     );
   }
@@ -154,12 +175,23 @@ export default function Page() {
     }
     return [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   };
-  const alloc =
+  const allocRaw =
     allocMode === "sektory"
       ? groupSum((h) => h.sector)
       : allocMode === "meny"
       ? groupSum((h) => h.currency)
       : holdings.filter((h) => h.marketValueCzk > 0).map((h) => ({ name: h.instrument, value: h.marketValueCzk }));
+  // Past ~8 slices a pie/legend stops being readable — fold anything under 3% of the total
+  // into a single "Ostatní" bucket so the chart and legend stay scannable at a glance.
+  const alloc = (() => {
+    if (allocRaw.length <= 8) return allocRaw;
+    const total = allocRaw.reduce((sum, a) => sum + a.value, 0);
+    const big = allocRaw.filter((a) => a.value / total >= 0.03);
+    const small = allocRaw.filter((a) => a.value / total < 0.03);
+    if (!small.length) return allocRaw;
+    const otherValue = small.reduce((sum, a) => sum + a.value, 0);
+    return [...big, { name: `Ostatní (${small.length})`, value: otherValue }];
+  })();
 
   const deposits = (s.cashflowByMonth as any[])
     .filter((m) => m.month >= DEPOSITS_FROM)
@@ -184,9 +216,11 @@ export default function Page() {
             <button
               onClick={() => load(true)}
               disabled={refreshing}
-              className="text-sm px-3 py-2 rounded-xl border border-line hover:bg-panel2 transition disabled:opacity-50"
+              className={`text-sm px-3 py-2 rounded-xl border transition disabled:opacity-50 ${
+                justRefreshed ? "border-pos/40 text-pos" : "border-line hover:bg-panel2"
+              }`}
             >
-              {refreshing ? "Stahuji…" : "↻ Obnovit ceny"}
+              {refreshing ? "Stahuji…" : justRefreshed ? "✓ Aktualizováno" : "↻ Obnovit ceny"}
             </button>
             <InfoTip text="Ihned stáhne aktuální ceny akcií, kurz a rating analytiků (jinak se stránka sama obnovuje každých 5 minut)." />
           </div>
@@ -196,6 +230,27 @@ export default function Page() {
       </div>
 
       {error && <p className="text-neg mb-4 text-sm">{error}</p>}
+
+      {/* Headline — the one number to check at a glance, before the KPI grid below explains it. */}
+      {risk && (
+        <div className="card p-5 mb-6 flex flex-wrap items-center gap-x-8 gap-y-3">
+          <div>
+            <div className="stat-label">
+              Roční výnos portfolia (TWR, p.a.)
+              <InfoTip text="Anualizovaný time-weighted výnos portfolia (nezávislý na načasování a velikosti vkladů)." />
+            </div>
+            <div className={`text-3xl font-semibold mt-1 tabular-nums ${(risk.annualizedReturn ?? 0) >= 0 ? "text-pos" : "text-neg"}`}>
+              {pct((risk.annualizedReturn ?? 0) * 100)}
+            </div>
+          </div>
+          <span
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg text-neg bg-neg/10"
+            title="Největší propad z vrcholu na následné dno (max drawdown) za sledované období."
+          >
+            Max. pokles {((risk.maxDrawdown ?? 0) * 100).toFixed(1)} %
+          </span>
+        </div>
+      )}
 
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
@@ -277,23 +332,11 @@ export default function Page() {
           hint="Obě křivky startují na 100. S&P 500 je počítáno jako Total Return index (^SP500TR, vč. reinvestovaných dividend) — fér srovnání proti tvému portfoliu, které dividendy a úroky taky zahrnuje do výkonnosti."
         >
           {risk && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <MiniStat
-                label="Roční výnos (p.a.)"
-                value={pct((risk.annualizedReturn ?? 0) * 100)}
-                tone={(risk.annualizedReturn ?? 0) >= 0 ? "pos" : "neg"}
-                hint="Anualizovaný time-weighted výnos portfolia (nezávislý na načasování a velikosti vkladů)."
-              />
+            <div className="grid grid-cols-2 gap-3 mb-4">
               <MiniStat
                 label="Volatilita (p.a.)"
                 value={`${((risk.volatility ?? 0) * 100).toFixed(1)} %`}
                 hint="Kolísavost denních výnosů, anualizovaná (směr. odchylka × √252). Vyšší = rizikovější."
-              />
-              <MiniStat
-                label="Max. pokles"
-                value={`${((risk.maxDrawdown ?? 0) * 100).toFixed(1)} %`}
-                tone="neg"
-                hint="Největší propad z vrcholu na následné dno (max drawdown) za sledované období."
               />
               <MiniStat
                 label="Sharpe ratio"
@@ -313,6 +356,7 @@ export default function Page() {
           title="Nálada trhu"
           subtitle="VIX — index očekávané volatility S&P 500 („index strachu“)"
           hint="VIX měří implikovanou volatilitu opcí na S&P 500 na příštích 30 dní — čím vyšší, tím víc trh čeká výkyvy (strach); nízký VIX = klid. Pásma jsou obecně používaný odhad, ne oficiální klasifikace CBOE."
+          secondary
         >
           <MarketMood refreshTick={refreshTick} />
         </Section>
@@ -344,7 +388,7 @@ export default function Page() {
           </Section>
         </div>
         <div className="lg:col-span-2 min-w-0 h-full">
-          <Section title="Earnings kalendář" subtitle="Nejbližší termín výsledků" className="h-full flex flex-col">
+          <Section title="Earnings kalendář" subtitle="Nejbližší termín výsledků" className="h-full flex flex-col" secondary>
             <EarningsCalendar refreshTick={refreshTick} />
           </Section>
         </div>
@@ -409,6 +453,7 @@ export default function Page() {
           title="Daňový přehled"
           subtitle="Osvobození od daně z příjmu při prodeji akcií (§4/1/w ZDP)"
           hint="Orientační výpočet, ne daňové poradenství. Prodej je osvobozen, pokud je splněna ALESPOŇ JEDNA podmínka: časový test (držba přes 3 roky od nákupu, po jednotlivých FIFO tranších) nebo roční hodnotový limit (celkový hrubý příjem z prodeje CP v kalendářním roce do 100 000 Kč, bez ohledu na dobu držby)."
+          secondary
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <MiniStat
@@ -444,7 +489,7 @@ function Kpi({ label, value, sub, tone, hint }: { label: string; value: string; 
         {label}
         {hint && <InfoTip text={hint} />}
       </div>
-      <div className={`text-xl font-semibold mt-1 ${toneCls} truncate`}>{value}</div>
+      <div className={`text-xl font-semibold mt-1 tabular-nums ${toneCls} truncate`}>{value}</div>
       {sub && <div className="text-muted text-xs mt-1 truncate">{sub}</div>}
     </div>
   );
@@ -458,7 +503,7 @@ function MiniStat({ label, value, tone, hint }: { label: string; value: string; 
         {label}
         {hint && <InfoTip text={hint} />}
       </div>
-      <div className={`text-lg font-semibold mt-0.5 ${toneCls} truncate`}>{value}</div>
+      <div className={`text-lg font-semibold mt-0.5 tabular-nums ${toneCls} truncate`}>{value}</div>
     </div>
   );
 }
@@ -470,6 +515,7 @@ function Section({
   hint,
   className,
   children,
+  secondary,
 }: {
   title: string;
   subtitle?: string;
@@ -477,12 +523,15 @@ function Section({
   hint?: string;
   className?: string;
   children: React.ReactNode;
+  /** Lower-priority sections (VIX, earnings, tax) read visually quieter, so primary
+   * sections (value, performance, allocation, holdings) keep first claim on attention. */
+  secondary?: boolean;
 }) {
   return (
-    <div className={`card p-5 min-w-0 ${className ?? ""}`}>
+    <div className={`card p-5 min-w-0 ${secondary ? "card-secondary" : ""} ${className ?? ""}`}>
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-semibold">
+          <h2 className={secondary ? "text-sm font-medium text-white/85" : "text-base font-semibold"}>
             {title}
             {hint && <InfoTip text={hint} />}
           </h2>

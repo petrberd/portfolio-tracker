@@ -33,10 +33,12 @@ function useIsMobile() {
   return mobile;
 }
 
+// One coherent categorical family (cool blues/teals -> warm ambers/corals) instead of a
+// grab-bag of unrelated hues, so allocation charts read as a designed system even at 15 slices.
 const PALETTE = [
-  "#5b8cff", "#22c55e", "#f59e0b", "#ec4899", "#14b8a6",
-  "#a855f7", "#ef4444", "#84cc16", "#06b6d4", "#f97316",
-  "#8b5cf6", "#eab308", "#10b981", "#f43f5e", "#3b82f6",
+  "#5b8cff", "#3ba7c4", "#22c55e", "#84cc16", "#eab308",
+  "#f59e0b", "#f97316", "#ef4444", "#ec4899", "#d946ef",
+  "#a855f7", "#7c6cf0", "#14b8a6", "#38bdf8", "#64748b",
 ];
 
 const axisStyle = { fill: "#8b98b8", fontSize: 11 };
@@ -173,6 +175,7 @@ export function PerformanceChart({ data }: { data: { period: string; gain: numbe
             return [`${czk(v)}${gp != null ? `  ·  výnos (TWR) ${pct(gp)}` : ""}`, "Zisk"];
           }}
         />
+        <ReferenceLine y={0} stroke="#4b5875" strokeWidth={1.5} />
         <Bar dataKey="gain" radius={[3, 3, 0, 0]} isAnimationActive={false} minPointSize={3}>
           {data.map((d, i) => (
             <Cell key={i} fill={d.gain >= 0 ? "#22c55e" : "#ef4444"} />

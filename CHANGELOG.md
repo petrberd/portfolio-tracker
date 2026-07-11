@@ -4,6 +4,32 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.4.0] — 2026-07-11
+
+### Added
+- **Headline strip** nahoře stránky — roční výnos portfolia (TWR, p.a.) jako hero číslo +
+  „Max. pokles" jako rizikový flag, hned pod hlavičkou, před KPI dlaždicemi. Odstraněna
+  duplicita: tyto dvě hodnoty už se nezobrazují znovu v „Výkonnost vs. trh" (tam zůstává
+  jen Volatilita a Sharpe ratio).
+- **Seskupení malých pozic do „Ostatní"** v alokačním grafu — nad 8 položek se cokoliv pod
+  3 % podílu sloučí do jedné položky legendy, aby zůstala čitelná i s 13+ pozicemi.
+- **Slovní popisky na obou koncích gauge** (Nadhodnoceno/Podhodnoceno u Férové ceny,
+  Panika/Klid u VIX) — směr škály už nezávisí jen na zapamatování si barvy.
+- **Success stav u „Obnovit ceny"** — po dokončení refreshe se tlačítko na 2 s změní na
+  „✓ Aktualizováno" (zelený rámeček), místo tichého návratu na původní label.
+- Jemná ilustrace na pozadí prázdného stavu (appka bez nahraných dat).
+
+### Changed
+- **Sjednocená paleta** pro alokační graf — soudržná modro-tyrkysovo-jantarová škála místo
+  patnácti nesourodých barev vedle sebe.
+- **Vizuální hierarchie sekcí** — Nálada trhu, Earnings kalendář a Daňový přehled mají teď
+  tišší styl (menší nadpis, bez stínu, průhlednější pozadí), aby primární sekce (Hodnota,
+  Výkonnost, Alokace, Pozice) měly první nárok na pozornost.
+- Karty mají teď jemný statický stín (ne hover — většina karet není klikatelná, hover by
+  zavádějící naznačoval interaktivitu).
+- Všechny KPI a mini-stat hodnoty mají `tabular-nums`, aby při refreshi cen čísla neposkakovala.
+- Nulová referenční čára v grafu Výkonnosti portfolia je teď výraznější než gridlines.
+
 ## [1.3.0] — 2026-07-11
 
 ### Added

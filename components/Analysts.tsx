@@ -46,6 +46,8 @@ function FairPriceGauge({ upsidePct }: { upsidePct: number }) {
       min={-GAUGE_CLAMP}
       max={GAUGE_CLAMP}
       showTopTick
+      leftLabel="Nadhodnoceno"
+      rightLabel="Podhodnoceno"
     />
   );
 }

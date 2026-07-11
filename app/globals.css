@@ -21,6 +21,16 @@ body {
 
 .card {
   @apply bg-panel border border-line rounded-2xl;
+  /* Subtle static depth (not hover-triggered — most cards aren't clickable, so a
+     hover affordance would misleadingly imply they are). */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px -12px rgba(0, 0, 0, 0.35);
+}
+
+/* Lower-priority sections (secondary) sit at the same depth but read visually quieter,
+   so the eye lands on primary sections (value, performance, allocation, holdings) first. */
+.card-secondary {
+  @apply bg-panel/70 border-line/70;
+  box-shadow: none;
 }
 
 .stat-label {

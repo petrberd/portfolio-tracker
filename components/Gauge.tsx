@@ -16,12 +16,17 @@ export function SemiGauge({
   min,
   max,
   showTopTick = false,
+  leftLabel,
+  rightLabel,
 }: {
   zones: string[]; // colors, left to right, equal width
   value: number;
   min: number;
   max: number;
   showTopTick?: boolean;
+  /** Word label under the arc's left/right end, so the "good" direction never depends on remembering a color. */
+  leftLabel?: string;
+  rightLabel?: string;
 }) {
   const cx = 110,
     cy = 100,
@@ -34,7 +39,7 @@ export function SemiGauge({
   const topTick = gaugePoint(cx, cy, r + 10, 90);
 
   return (
-    <svg viewBox="0 0 220 120" className="w-full max-w-[240px] mx-auto">
+    <svg viewBox="0 0 220 132" className="w-full max-w-[240px] mx-auto">
       {zones.map((color, i) => {
         const g0 = i * bandWidth;
         const g1 = (i + 1) * bandWidth;
@@ -54,6 +59,16 @@ export function SemiGauge({
       {showTopTick && <line x1={cx} y1={cy - r + 4} x2={topTick.x} y2={topTick.y} stroke="#8b98b8" strokeWidth={2} />}
       <line x1={cx} y1={cy} x2={needleTip.x} y2={needleTip.y} stroke="#e5e7eb" strokeWidth={3} strokeLinecap="round" />
       <circle cx={cx} cy={cy} r={6} fill="#e5e7eb" />
+      {leftLabel && (
+        <text x={cx - r} y={cy + 22} textAnchor="start" fill="#8b98b8" fontSize={10}>
+          {leftLabel}
+        </text>
+      )}
+      {rightLabel && (
+        <text x={cx + r} y={cy + 22} textAnchor="end" fill="#8b98b8" fontSize={10}>
+          {rightLabel}
+        </text>
+      )}
     </svg>
   );
 }
