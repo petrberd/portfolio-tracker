@@ -2,6 +2,8 @@ import type { ParsedExport } from "./parseXtb";
 import { yahooSymbol, fetchChart, fetchFxCzk, fetchDailyCloses } from "./prices";
 import { getExternalDisposals } from "./transfers";
 
+const DAY = 86400000;
+
 export interface ValuePoint {
   date: string; // YYYY-MM-DD
   value: number; // total portfolio value = stock holdings + cash (CZK) — used for performance
@@ -290,8 +292,14 @@ export interface BenchmarkPoint {
  */
 export async function buildBenchmark(series: ValuePoint[]): Promise<BenchmarkPoint[]> {
   if (series.length < 2) return [];
-  let spCloses = await fetchDailyCloses("^SP500TR", "2y");
-  if (!spCloses.length) spCloses = await fetchDailyCloses("^GSPC", "2y"); // fallback if TR index is ever unavailable
+  // Yahoo's chart endpoint only returns full daily granularity for an explicit range
+  // (1y/2y/5y/10y); "max" silently downsamples to monthly. Pick the smallest bucket
+  // that still covers the portfolio's whole history, so a years-old account doesn't
+  // get its early benchmark points silently dropped by a range that's too short.
+  const yearsSpan = (Date.now() - new Date(series[0].date).getTime()) / (365 * DAY);
+  const range = yearsSpan <= 1 ? "1y" : yearsSpan <= 2 ? "2y" : yearsSpan <= 5 ? "5y" : "10y";
+  let spCloses = await fetchDailyCloses("^SP500TR", range);
+  if (!spCloses.length) spCloses = await fetchDailyCloses("^GSPC", range); // fallback if TR index is ever unavailable
   if (!spCloses.length) return [];
   const spByDate = new Map(spCloses.map((c) => [c.date, c.close]));
 

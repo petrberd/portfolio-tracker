@@ -18,14 +18,25 @@ import { InfoTip } from "@/components/InfoTip";
 import { holdingTaxStatus, ANNUAL_VALUE_LIMIT_CZK } from "@/lib/taxtest";
 
 type Data = any;
-const VALUE_FROM = "2024-10-31"; // value-over-time chart starts here
-const DEPOSITS_FROM = "2024-10"; // deposits chart from Oct 2024 on
-const DIVIDENDS_FROM = "2025-01"; // dividends chart from Jan 2025 on
-const PERFORMANCE_FROM = "2024-08"; // monthly performance chart starts here (yearly view is unfiltered)
-// These are lower bounds only — every chart's upper end is "today", computed fresh on
-// each request from live data, so new months (deposits, dividends, performance, the
-// income projection) show up on their own as time passes. Nothing here needs a manual
-// monthly bump.
+// Every chart's upper end is "today", computed fresh on each request from live data, so
+// new months (deposits, dividends, performance, the income projection) show up on their
+// own as time passes. The lower bounds below are derived from the account's own data
+// (first transaction, first dividend) rather than hardcoded dates, so a different
+// account's history — of any length or start date — needs no manual editing here.
+
+/** "YYYY-MM" shifted by `n` months (n can be negative). */
+function addMonths(yyyyMm: string, n: number): string {
+  const [y, m] = yyyyMm.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return d.toISOString().slice(0, 7);
+}
+
+/** "YYYY-MM" -> "M/YYYY" (e.g. "2024-10" -> "10/2024"). */
+function monthYear(yyyyMm: string): string {
+  if (!yyyyMm) return "";
+  const [y, m] = yyyyMm.split("-");
+  return `${parseInt(m, 10)}/${y}`;
+}
 
 export default function Page() {
   const [data, setData] = useState<Data | null>(null);
@@ -109,6 +120,17 @@ export default function Page() {
 
   const s = data.summary;
   const holdings = data.holdings as any[];
+
+  // First full calendar month of activity — the first (often partial, mid-month) month
+  // is skipped so the value/performance charts start on a clean, meaningful baseline.
+  const firstOpMonth = (s.firstOpDate as string)?.slice(0, 7) || "";
+  const secondFullMonth = firstOpMonth ? addMonths(firstOpMonth, 1) : "";
+  const VALUE_FROM = secondFullMonth ? `${secondFullMonth}-01` : "";
+  const DEPOSITS_FROM = secondFullMonth;
+  const PERFORMANCE_FROM = secondFullMonth;
+  // First month with an actual dividend, so the chart never opens with a run of blank months.
+  const DIVIDENDS_FROM = (s.dividendByMonth as any[])?.[0]?.month ?? firstOpMonth;
+
   const series = (data.series as any[]).filter((p) => p.date >= VALUE_FROM);
   const perf = ((data.performance?.[perfMode] ?? []) as any[]).filter(
     (p) => perfMode !== "monthly" || p.period >= PERFORMANCE_FROM
@@ -337,7 +359,7 @@ export default function Page() {
 
       {/* Dividends + deposits */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <Section title="Dividendy v čase" subtitle="Přijaté dividendy po měsících od 1/2025, podle titulu (brutto, CZK)">
+        <Section title="Dividendy v čase" subtitle={`Přijaté dividendy po měsících od ${monthYear(DIVIDENDS_FROM)}, podle titulu (brutto, CZK)`}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <MiniStat
               label="Příjem za 12 měsíců"
@@ -362,13 +384,13 @@ export default function Page() {
             <Empty msg="Zatím žádné dividendy." />
           )}
         </Section>
-        <Section title="Vklady" subtitle="Měsíční vklady od 10/2024 (CZK)">
+        <Section title="Vklady" subtitle={`Měsíční vklady od ${monthYear(DEPOSITS_FROM)} (CZK)`}>
           {deposits.length > 0 && (
             <div className="grid grid-cols-1 gap-3 mb-4">
               <MiniStat
                 label="Průměrný vklad / měsíc"
                 value={czk(avgMonthlyDeposit)}
-                hint="Součet vkladů od 10/2024 vydělený počtem měsíců v tomto období (vč. měsíců bez vkladu)."
+                hint={`Součet vkladů od ${monthYear(DEPOSITS_FROM)} vydělený počtem měsíců v tomto období (vč. měsíců bez vkladu).`}
               />
             </div>
           )}
