@@ -19,6 +19,9 @@ Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind.
 ## Architektura
 - `lib/parseXtb.ts` — parsuje XTB export (listy *Cash Operations*, *Closed Positions*). Počet kusů
   a cenu tahá z komentářů (`OPEN BUY 0.0709 @ 994.00`).
+- `lib/parseRevolut.ts` — parsuje Revolut Stocks CSV export do stejného `CashOp[]` tvaru jako XTB.
+  Peněžní pole mají měnu jako textový prefix (`"EUR 150"`); do CZK přes Revolutem uváděný `FX Rate`
+  u každé transakce (`CZK = částka / FX Rate`, ověřeno na reálných datech).
 - `lib/positions.ts` — **FIFO** rekonstrukce pozic z cash operations, cost basis v CZK, realizovaný
   P/L, dividendy (vč. rozpadu po měsících a titulech).
 - `lib/prices.ts` — ceny z Yahoo. `fetchChart` (range=max, cachováno), `fetchDailyCloses` (denní, pro
@@ -32,7 +35,9 @@ Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind.
 - `lib/news.ts` — novinky z Yahoo RSS.
 - `lib/divcalendar.ts` — dividendový kalendář (frekvence, částka, ex/pay date) z Nasdaqu (fallback Yahoo)
   a projekce plateb na 12 měsíců.
-- `lib/store.ts` — persistence naimportovaného exportu do `data/export.json`.
+- `lib/store.ts` — persistence per broker (`data/export.json` pro XTB, `data/export-revolut.json`
+  pro Revolut); `loadExport()` obě sloučí do jednoho portfolia (concat + sort `cashOps`), takže
+  všechny downstream routy fungují beze změny bez ohledu na to, kolik brokerů je nahraných.
 - API routy: `app/api/{import,portfolio,valuation?,analysts,stockdetail,dividends}` — čtou libs, cachují do `data/*.json`.
 - UI: `app/page.tsx` (dashboard) + `components/` (Charts, Analysts, StockDetail, DividendCalendar).
 
@@ -66,8 +71,11 @@ Perzistence jde přes `lib/storage.ts` (`readJson`/`writeJson`): **lokálně sou
 Když přidáváš nový cache modul, čti/zapisuj přes `storage.ts`, ne přes `fs` napřímo (jinak spadne na Netlify).
 
 ## Basic auth
-`middleware.ts` schová celý web za HTTP Basic Auth, když jsou nastavené `BASIC_AUTH_USER` +
-`BASIC_AUTH_PASSWORD` (jinak je web otevřený). Creds nejsou v repu — lokálně `.env.local`, na Netlify env.
+`middleware.ts` schová celý web za HTTP Basic Auth, ale jen na produkci
+(`NODE_ENV=production`, tj. na Netlify) — lokální `npm run dev` běží vždy bez hesla, aby
+testování appky nevyžadovalo opakované zadávání přihlašovacích údajů. Na produkci se vynucuje
+jen když jsou nastavené `BASIC_AUTH_USER` + `BASIC_AUTH_PASSWORD` (jinak je web otevřený).
+Creds nejsou v repu — lokálně `.env.local`, na Netlify env.
 
 ## Verzování
 Od v1.0.0 (2026-07-11) se appka verzuje: [Keep a Changelog](https://keepachangelog.com/) formát

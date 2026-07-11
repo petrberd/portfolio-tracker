@@ -1,9 +1,11 @@
 # Portfolio Tracker
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue)](CHANGELOG.md)
 
-Lokální webová aplikace na sledování investičního portfolia z XTB — po vzoru Alocano / Stonkee.
-Naimportuje Excel export z XTB, zrekonstruuje aktuální pozice a spočítá výkonnost proti živým cenám.
+Lokální webová aplikace na sledování investičního portfolia z **XTB a/nebo Revolutu** —
+po vzoru Alocano / Stonkee. Naimportuje export z brokera(ů), zrekonstruuje aktuální pozice
+a spočítá výkonnost proti živým cenám. Oba brokery lze mít nahrané současně — appka je
+sloučí do jednoho společného portfolia.
 
 Co je nového: [CHANGELOG.md](CHANGELOG.md).
 
@@ -15,11 +17,13 @@ cp .env.example .env.local  # volitelně: doplň FINNHUB_API_KEY (free) pro insi
 npm run dev                 # http://localhost:3210
 ```
 
-Při prvním otevření (bez dat) appka ukáže obrazovku **Nahrát XTB export (.xlsx)** — nahraj svůj
-export z XTB (xStation → Account statement → Export). Data zůstávají lokálně ve složce `data/`
-(negitignorovaná, nesdílí se). Tlačítko **Obnovit ceny** stáhne aktuální kurzy.
+Při prvním otevření (bez dat) appka ukáže obrazovku pro nahrání exportu — **XTB** (xStation →
+Account statement → Export, `.xlsx`) a/nebo **Revolut** (Stocks → account statement, `.csv`).
+Data zůstávají lokálně ve složce `data/` (negitignorovaná, nesdílí se). Tlačítko
+**Obnovit ceny** stáhne aktuální kurzy.
 
-> Pozn.: appka se dodává **bez dat** — každý si nahraje svůj vlastní XTB export.
+> Pozn.: appka se dodává **bez dat** — každý si nahraje svůj vlastní export. Basic Auth se
+> vynucuje jen na produkci (Netlify) — lokální `npm run dev` běží bez hesla.
 > Bez `FINNHUB_API_KEY` appka funguje, jen skryje insider obchody a sektorovou alokaci
 > (klíč zdarma na finnhub.io). Kontext pro další vývoj s Claude je v [CLAUDE.md](CLAUDE.md).
 
@@ -68,7 +72,7 @@ reálné riziko je zanedbatelné.
    - `CASH_CONFIG_JSON` — (volitelně) spořicí účty jako JSON, např.
      `{"interestTaxPct":15,"accounts":[{"name":"Raiffeisenbank","balance":1000000,"ratePct":4}]}`
 4. Perzistence: lokálně soubory v `data/`, na Netlify **Netlify Blobs** (read-only FS) —
-   řeší `lib/storage.ts` automaticky. XTB export nahraješ přímo na živém webu, uloží se do Blobs.
+   řeší `lib/storage.ts` automaticky. XTB i Revolut export nahraješ přímo na živém webu, uloží se do Blobs.
 
 > Data se na Netlify **nedeployují** (`data/` je gitignored). Portfolio nahraješ na živém webu.
 
@@ -125,14 +129,26 @@ uzavřenému dennímu close.
 
 ## Jak to počítá
 
-- **Import** (`lib/parseXtb.ts`) — čte listy *Cash Operations* a *Closed Positions*.
-  Počet kusů a cenu tahá z komentářů (`OPEN BUY 0.0709 @ 994.00`).
+- **Import** — `lib/parseXtb.ts` čte listy *Cash Operations* a *Closed Positions* z XTB
+  Excelu (počet kusů a cenu tahá z komentářů typu `OPEN BUY 0.0709 @ 994.00`).
+  `lib/parseRevolut.ts` čte Revolut CSV (`Date, Ticker, Type, Quantity, Price per share,
+  Total Amount, Currency, FX Rate`) — peněžní pole mají měnu jako textový prefix
+  (`"EUR 150"`), do CZK se přepočítávají přes Revolutem uváděný `FX Rate` u každé
+  transakce (`CZK = částka / FX Rate`). Oba parsery produkují stejný `CashOp[]` tvar,
+  takže zbytek appky (FIFO, dividendy, grafy) běží nezávisle na brokerovi.
+- **Uložení + sloučení** (`lib/store.ts`) — každý broker má vlastní soubor
+  (`export.json` pro XTB, `export-revolut.json` pro Revolut); při čtení se sloučí do
+  jednoho portfolia (spojené `cashOps` seřazené chronologicky).
 - **Pozice** (`lib/positions.ts`) — FIFO rekonstrukce z nákupů a prodejů (výchozí účetní
-  metoda XTB). Zbývající loty = aktuálně držené portfolio (vč. data nákupu pro časový test);
-  cost basis je v CZK. Počítá i roční hrubý příjem z prodejů (`taxYearSoldCzk`).
+  metoda XTB, použitá stejně pro sloučená data). Zbývající loty = aktuálně držené
+  portfolio (vč. data nákupu pro časový test); cost basis je v CZK. Počítá i roční hrubý
+  příjem z prodejů (`taxYearSoldCzk`).
 - **Ceny** (`lib/prices.ts`) — přímé volání veřejného Yahoo Finance chart endpointu
   (`query1`, bez API klíče). Jeden dotaz na titul dá měnu, aktuální cenu i historii.
   Ceny se cachují 1 h do `data/prices.json` (tlačítko „Obnovit ceny" cache obchází).
+  Revolut export nemá u tickeru burzovní příponu (na rozdíl od XTB `MU.US`) — když
+  holý ticker na Yahoo nic nevrátí, zkusí se jednou fallback `.DE` (Xetra); ověřeno na
+  reálných datech, ale není to obecné řešení pro všechny burzy.
 - **Časová řada** (`lib/timeseries.ts`) — denní počty kusů × historické close × **dobový**
   FX kurz (ne dnešní) → hodnota v CZK. Benchmark vs. S&P 500 Total Return volí nejmenší
   dostatečný rozsah historie (1y/2y/5y/10y), aby se u staršího účtu tiše neuseknul.
@@ -147,7 +163,8 @@ uzavřenému dennímu close.
 
 Lokálně v `data/` (gitignored), na Netlify přes Netlify Blobs (`lib/storage.ts`):
 
-- `export.json` — poslední naimportovaný export.
+- `export.json` — poslední naimportovaný XTB export.
+- `export-revolut.json` — poslední naimportovaný Revolut export (volitelné, odděleně od XTB).
 - `prices.json`, `fundamentals.json`, `analysts.json`, `finnhub.json`, `divcal.json`,
   `earnings.json` — cache jednotlivých datových zdrojů (smaž pro vynucené stažení; TTL se
   liší modul od modulu, viz komentáře v `lib/`).

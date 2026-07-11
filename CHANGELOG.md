@@ -4,6 +4,20 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.2.0] — 2026-07-11
+
+### Added
+- **Import z Revolutu** (.csv export ze Stocks účtu), sloučený do jednoho společného
+  portfolia s XTB — FIFO, dividendy i grafy fungují napříč oběma brokery beze změny.
+  Přepočet do CZK jde přes Revolutem uváděný kurz u každé transakce (ověřeno na reálných
+  datech). Nahrávací tlačítka pro XTB a Revolut jsou teď oddělená.
+- Jednorázový fallback `.DE` (Xetra) na dohledání ceny, když Revolut ticker bez burzovní
+  přípony neresolvuje na Yahoo napřímo (ověřeno na dvou reálně držených evropských ETF).
+
+### Known limitations
+- Revolut export neobsahuje burzovní příponu u tickeru — `.DE` fallback není obecné řešení
+  pro všechny burzy, jen běžný odhad pro evropské tituly.
+
 ## [1.1.0] — 2026-07-11
 
 ### Fixed
