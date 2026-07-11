@@ -20,6 +20,64 @@ const RATING: Record<string, { label: string; color: string }> = {
   "Strong Sell": { label: "Silný prodej", color: "#ef4444" },
 };
 
+// Fair-value gauge zones, keyed by upside % (target vs. current price).
+// Mirrored vs. the usual layout: strongly undervalued sits on the RIGHT.
+const GAUGE_ZONES = [
+  { max: -18, label: "Silně nadhodnocená", color: "#ef4444" },
+  { max: -6, label: "Nadhodnocená", color: "#f97316" },
+  { max: 6, label: "Přiměřeně oceněná", color: "#eab308" },
+  { max: 18, label: "Podhodnocená", color: "#84cc16" },
+  { max: Infinity, label: "Silně podhodnocená", color: "#16a34a" },
+];
+const GAUGE_CLAMP = 30; // upside % mapped to the arc's outer edges beyond this
+
+function zoneFor(upsidePct: number) {
+  return GAUGE_ZONES.find((z) => upsidePct < z.max) ?? GAUGE_ZONES[GAUGE_ZONES.length - 1];
+}
+
+/** Point on the gauge's semicircle at angle `g` (0 = left end, 180 = right end). */
+function gaugePoint(cx: number, cy: number, r: number, g: number) {
+  const theta = ((180 - g) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(theta), y: cy - r * Math.sin(theta) };
+}
+
+/** Mirrored "fair value" gauge: strongly undervalued on the right, overvalued on the left. */
+function FairPriceGauge({ upsidePct }: { upsidePct: number }) {
+  const cx = 110,
+    cy = 100,
+    r = 84;
+  const gapDeg = 3;
+  const bands = [0, 36, 72, 108, 144, 180];
+  const needleG = ((Math.max(-GAUGE_CLAMP, Math.min(GAUGE_CLAMP, upsidePct)) + GAUGE_CLAMP) / (2 * GAUGE_CLAMP)) * 180;
+  const needleTip = gaugePoint(cx, cy, r - 18, needleG);
+  const fairTick = gaugePoint(cx, cy, r + 10, 90);
+
+  return (
+    <svg viewBox="0 0 220 120" className="w-full max-w-[240px] mx-auto">
+      {bands.slice(0, 5).map((g0, i) => {
+        const g1 = bands[i + 1];
+        const p0 = gaugePoint(cx, cy, r, g0 + gapDeg / 2);
+        const p1 = gaugePoint(cx, cy, r, g1 - gapDeg / 2);
+        return (
+          <path
+            key={i}
+            d={`M ${p0.x} ${p0.y} A ${r} ${r} 0 0 1 ${p1.x} ${p1.y}`}
+            stroke={GAUGE_ZONES[i].color}
+            strokeWidth={14}
+            strokeLinecap="round"
+            fill="none"
+          />
+        );
+      })}
+      {/* "Fair price" tick above the middle (yellow) band */}
+      <line x1={cx} y1={cy - r + 4} x2={fairTick.x} y2={fairTick.y} stroke="#8b98b8" strokeWidth={2} />
+      {/* Needle */}
+      <line x1={cx} y1={cy} x2={needleTip.x} y2={needleTip.y} stroke="#e5e7eb" strokeWidth={3} strokeLinecap="round" />
+      <circle cx={cx} cy={cy} r={6} fill="#e5e7eb" />
+    </svg>
+  );
+}
+
 const ROWS: { key: keyof Breakdown; label: string; color: string }[] = [
   { key: "strongBuy", label: "Silný nákup", color: "#16a34a" },
   { key: "buy", label: "Nákup", color: "#22c55e" },
@@ -99,11 +157,11 @@ export function AnalystPanel({ holdings, refreshTick = 0 }: { holdings: Holding[
 
       {!loading && a && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Price target */}
+          {/* Fair value gauge */}
           <div className="min-w-0">
             <div className="stat-label">
-              Cílová cena (12 měsíců)
-              <InfoTip text="Průměrná 12měsíční cílová cena analytiků. Potenciál = rozdíl vůči aktuální ceně." />
+              Férová cena
+              <InfoTip text="Průměrná 12měsíční cílová cena analytiků coby odhad férové hodnoty. Ukazatel: jak moc se od ní aktuální cena odchyluje (mimo ±30 % je jehla na krajní hodnotě stupnice)." />
             </div>
             <div className={`text-3xl font-semibold mt-1 ${up != null && up >= 0 ? "text-pos" : "text-neg"}`}>
               {money(a.targetPrice, ccy)}
@@ -114,7 +172,16 @@ export function AnalystPanel({ holdings, refreshTick = 0 }: { holdings: Holding[
                 {up.toFixed(1)} % vs. aktuální cena {money(data.price, ccy)}
               </div>
             )}
-            <div className="text-muted text-xs mt-3">Podle {a.count} analytiků za poslední ~3 měsíce.</div>
+            {up != null && (
+              <span
+                className="inline-block text-xs font-semibold px-2.5 py-1 rounded-lg mt-2"
+                style={{ color: zoneFor(up).color, background: `${zoneFor(up).color}1f` }}
+              >
+                {zoneFor(up).label}
+              </span>
+            )}
+            {up != null && <FairPriceGauge upsidePct={up} />}
+            <div className="text-muted text-xs mt-2">Podle {a.count} analytiků za poslední ~3 měsíce.</div>
           </div>
 
           {/* Rating breakdown */}

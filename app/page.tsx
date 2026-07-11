@@ -328,30 +328,6 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Tax time test + annual value-limit exemption */}
-      <div className="mt-6">
-        <Section
-          title="Daňový přehled"
-          subtitle="Osvobození od daně z příjmu při prodeji akcií (§4/1/w ZDP)"
-          hint="Orientační výpočet, ne daňové poradenství. Prodej je osvobozen, pokud je splněna ALESPOŇ JEDNA podmínka: časový test (držba přes 3 roky od nákupu, po jednotlivých FIFO tranších) nebo roční hodnotový limit (celkový hrubý příjem z prodeje CP v kalendářním roce do 100 000 Kč, bez ohledu na dobu držby)."
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-            <MiniStat
-              label="Využito ročního limitu"
-              value={`${czk(s.taxYearSoldCzk ?? 0)} / ${czk(ANNUAL_VALUE_LIMIT_CZK)}`}
-              tone={(s.taxYearSoldCzk ?? 0) > ANNUAL_VALUE_LIMIT_CZK ? "neg" : undefined}
-              hint="Hrubý příjem (ne zisk) z prodeje akcií v aktuálním kalendářním roce. Pod 100 000 Kč je zisk osvobozený bez ohledu na dobu držby."
-            />
-            <MiniStat
-              label="Zbývá do limitu"
-              value={czk(Math.max(0, ANNUAL_VALUE_LIMIT_CZK - (s.taxYearSoldCzk ?? 0)))}
-              hint="Kolik ještě letos můžeš prodat (hrubý příjem), aby zisk zůstal osvobozený i bez splnění časového testu."
-            />
-          </div>
-          <TaxTestTable holdings={holdings} />
-        </Section>
-      </div>
-
       {/* Analyst forecasts & ratings */}
       <div className="mt-6">
         <AnalystPanel holdings={holdings.map((h) => ({ symbol: h.symbol, instrument: h.instrument }))} refreshTick={refreshTick} />
@@ -402,6 +378,30 @@ export default function Page() {
       <div className="mt-6">
         <Section title="Projekce příjmů" subtitle="Očekávaný příjem na 12 měsíců: dividendy (podle akcií k ex-dni) + úroky ze spořicích účtů (netto po 15% dani)">
           <DividendCalendar refreshTick={refreshTick} />
+        </Section>
+      </div>
+
+      {/* Tax time test + annual value-limit exemption */}
+      <div className="mt-6">
+        <Section
+          title="Daňový přehled"
+          subtitle="Osvobození od daně z příjmu při prodeji akcií (§4/1/w ZDP)"
+          hint="Orientační výpočet, ne daňové poradenství. Prodej je osvobozen, pokud je splněna ALESPOŇ JEDNA podmínka: časový test (držba přes 3 roky od nákupu, po jednotlivých FIFO tranších) nebo roční hodnotový limit (celkový hrubý příjem z prodeje CP v kalendářním roce do 100 000 Kč, bez ohledu na dobu držby)."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <MiniStat
+              label="Využito ročního limitu"
+              value={`${czk(s.taxYearSoldCzk ?? 0)} / ${czk(ANNUAL_VALUE_LIMIT_CZK)}`}
+              tone={(s.taxYearSoldCzk ?? 0) > ANNUAL_VALUE_LIMIT_CZK ? "neg" : undefined}
+              hint="Hrubý příjem (ne zisk) z prodeje akcií v aktuálním kalendářním roce. Pod 100 000 Kč je zisk osvobozený bez ohledu na dobu držby."
+            />
+            <MiniStat
+              label="Zbývá do limitu"
+              value={czk(Math.max(0, ANNUAL_VALUE_LIMIT_CZK - (s.taxYearSoldCzk ?? 0)))}
+              hint="Kolik ještě letos můžeš prodat (hrubý příjem), aby zisk zůstal osvobozený i bez splnění časového testu."
+            />
+          </div>
+          <TaxTestTable holdings={holdings} />
         </Section>
       </div>
 
