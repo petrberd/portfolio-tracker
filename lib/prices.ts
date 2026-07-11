@@ -139,7 +139,15 @@ export async function fetchHistory(symbol: string, from: string, force = false):
 
 /**
  * Latest price + true day-over-day % change: the live `regularMarketPrice`
- * against the most recent *completed* daily close (yesterday's close).
+ * against the most recent *completed* daily close (yesterday's close — or
+ * Friday's, over a weekend).
+ *
+ * Needs genuinely daily-granularity closes: `chart.closes` (from `fetchChart`,
+ * a range=max request) is only MONTHLY, so a "previous" bar found there was
+ * actually last month's close. `meta.chartPreviousClose` doesn't fix this
+ * either — it's also computed relative to that monthly chart, not to the
+ * true previous trading day (confirmed empirically: it didn't match any real
+ * daily close). So this fetches a short daily-granularity range separately.
  */
 export async function fetchQuote(
   symbol: string,
@@ -147,15 +155,15 @@ export async function fetchQuote(
 ): Promise<{ price: number; changePercent: number; currency: string }> {
   const chart = await fetchChart(symbol, force);
   if (!chart) return { price: 0, changePercent: 0, currency: "USD" };
-  const closes = chart.closes;
-  const n = closes.length;
-  const current = chart.price || closes[n - 1]?.close || 0;
-  // Previous close = last bar strictly before the most recent bar's date.
-  const lastDate = closes[n - 1]?.date ?? "";
-  let prev = closes[n - 2]?.close ?? current;
+  const current = chart.price || chart.closes[chart.closes.length - 1]?.close || 0;
+
+  const daily = await fetchDailyCloses(symbol, "5d");
+  const n = daily.length;
+  const lastDate = daily[n - 1]?.date ?? "";
+  let prev = daily[n - 2]?.close ?? current;
   for (let i = n - 1; i >= 0; i--) {
-    if (closes[i].date < lastDate) {
-      prev = closes[i].close;
+    if (daily[i].date < lastDate) {
+      prev = daily[i].close;
       break;
     }
   }

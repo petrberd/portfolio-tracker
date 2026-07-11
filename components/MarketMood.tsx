@@ -61,7 +61,15 @@ export function MarketMood({ refreshTick = 0 }: { refreshTick?: number }) {
             {level.label}
           </span>
         </div>
-        <SemiGauge zones={VIX_LEVELS.map((l) => l.color)} value={data.vix} min={VIX_MIN} max={VIX_MAX} />
+        {/* Mirrored like the Fair Price gauge: best (calmest) reading on the right.
+            Reflect the value around the scale's midpoint and reverse the zone colors,
+            since low VIX is "good" here (unlike upsidePct, where high is already good). */}
+        <SemiGauge
+          zones={[...VIX_LEVELS].reverse().map((l) => l.color)}
+          value={VIX_MIN + VIX_MAX - data.vix}
+          min={VIX_MIN}
+          max={VIX_MAX}
+        />
       </div>
       {data.history?.length ? (
         <VixChart data={data.history} />

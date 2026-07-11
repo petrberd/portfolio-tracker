@@ -18,8 +18,15 @@ function timingSafeEqual(a: string, b: string): boolean {
  * HTTP Basic Auth over the whole site. Active only when BASIC_AUTH_USER and
  * BASIC_AUTH_PASSWORD are set (locally in .env.local, on Netlify as env vars),
  * so the credentials never live in the repo. If unset, the app is open.
+ *
+ * Skipped entirely outside production (`npm run dev`) — the deployed site on
+ * Netlify still enforces it (that build runs with NODE_ENV=production), but a
+ * local dev server is already only reachable on the developer's own machine,
+ * so gating it too just adds friction without a real security benefit.
  */
 export function middleware(req: NextRequest) {
+  if (process.env.NODE_ENV !== "production") return NextResponse.next();
+
   const user = process.env.BASIC_AUTH_USER;
   const pass = process.env.BASIC_AUTH_PASSWORD;
   if (!user || !pass) return NextResponse.next();

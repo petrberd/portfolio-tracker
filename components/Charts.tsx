@@ -112,7 +112,7 @@ export function VixChart({ data }: { data: { date: string; vix: number }[] }) {
           minTickGap={48}
           tickFormatter={(d) => new Date(d).toLocaleDateString("cs-CZ", { day: "numeric", month: "short" })}
         />
-        <YAxis tick={axisStyle} width={32} domain={[0, "auto"]} />
+        <YAxis tick={axisStyle} width={32} domain={["dataMin - 2", "dataMax + 2"]} />
         <Tooltip
           contentStyle={tooltipStyle}
           itemStyle={tipItem}
