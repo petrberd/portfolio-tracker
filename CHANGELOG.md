@@ -4,6 +4,20 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.1.0] — 2026-07-11
+
+### Fixed
+- **Denní změna % byla ve skutečnosti meziměsíční.** `fetchQuote` počítala "denní" změnu
+  z `chart.closes`, což je data z `range=max` dotazu — Yahoo u něj vrací jen měsíční
+  granularitu, takže "předchozí" bod byl konec předchozího měsíce, ne včerejšek. Postihovalo
+  to denní změnu u všech pozic v tabulce i u VIX (proto vypadala skoro pořád jako ~0 %).
+  Opraveno — počítá se teď ze skutečných denních dat.
+
+### Changed
+- Basic Auth se teď vynucuje jen na produkci (Netlify) — lokální `npm run dev` běží bez hesla.
+- Gauge u VIX zrcadlově obrácen jako u Férové ceny (nejklidnější hodnota vpravo).
+- Graf historie VIX má osu Y ořezanou na rozsah dat, ne od nuly — výkyvy jsou vidět.
+
 ## [1.0.0] — 2026-07-11
 
 První oficiálně verzovaná release — shrnuje vše postavené od začátku projektu do teď.

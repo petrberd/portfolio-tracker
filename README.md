@@ -1,6 +1,6 @@
 # Portfolio Tracker
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue)](CHANGELOG.md)
 
 Lokální webová aplikace na sledování investičního portfolia z XTB — po vzoru Alocano / Stonkee.
 Naimportuje Excel export z XTB, zrekonstruuje aktuální pozice a spočítá výkonnost proti živým cenám.
