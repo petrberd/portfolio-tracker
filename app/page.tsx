@@ -30,6 +30,7 @@ export default function Page() {
   const [perfMode, setPerfMode] = useState<"monthly" | "yearly">("monthly");
   const [allocMode, setAllocMode] = useState<"pozice" | "sektory" | "meny">("pozice");
   const [detail, setDetail] = useState<{ ticker: string; instrument: string } | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (force = false) => {
@@ -56,6 +57,15 @@ export default function Page() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Auto-refresh live data (prices, analyst ratings, dividend calendar…) every 5 minutes.
+  useEffect(() => {
+    const id = setInterval(() => {
+      load(true);
+      setRefreshTick((t) => t + 1);
+    }, 5 * 60 * 1000);
+    return () => clearInterval(id);
   }, [load]);
 
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,6 +145,7 @@ export default function Page() {
           <button
             onClick={() => load(true)}
             disabled={refreshing}
+            title="Ihned stáhne aktuální ceny akcií, kurz a rating analytiků (jinak se stránka sama obnovuje každých 5 minut)."
             className="text-sm px-3 py-2 rounded-xl border border-line hover:bg-panel2 transition disabled:opacity-50"
           >
             {refreshing ? "Stahuji…" : "↻ Obnovit ceny"}
@@ -286,7 +297,7 @@ export default function Page() {
 
       {/* Analyst forecasts & ratings */}
       <div className="mt-6">
-        <AnalystPanel holdings={holdings.map((h) => ({ symbol: h.symbol, instrument: h.instrument }))} />
+        <AnalystPanel holdings={holdings.map((h) => ({ symbol: h.symbol, instrument: h.instrument }))} refreshTick={refreshTick} />
       </div>
 
       {/* Dividends + deposits */}
@@ -324,7 +335,7 @@ export default function Page() {
       {/* Dividend projection / calendar */}
       <div className="mt-6">
         <Section title="Projekce příjmů" subtitle="Očekávaný příjem na 12 měsíců: dividendy (podle akcií k ex-dni) + úroky ze spořicích účtů (netto po 15% dani)">
-          <DividendCalendar />
+          <DividendCalendar refreshTick={refreshTick} />
         </Section>
       </div>
 

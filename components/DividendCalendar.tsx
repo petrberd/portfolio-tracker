@@ -8,7 +8,7 @@ import { czk } from "@/lib/format";
 const shortDate = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "2-digit" }) : "—";
 
-export function DividendCalendar() {
+export function DividendCalendar({ refreshTick = 0 }: { refreshTick?: number }) {
   const [d, setD] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -22,7 +22,8 @@ export function DividendCalendar() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTick]);
 
   if (loading) return <div className="h-[300px] flex items-center justify-center text-muted text-sm">Počítám projekci dividend…</div>;
   if (!d?.available || !d.payments?.length)

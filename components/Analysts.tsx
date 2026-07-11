@@ -36,7 +36,7 @@ interface Breakdown {
   strongSell: number;
 }
 
-export function AnalystPanel({ holdings }: { holdings: Holding[] }) {
+export function AnalystPanel({ holdings, refreshTick = 0 }: { holdings: Holding[]; refreshTick?: number }) {
   const [symbol, setSymbol] = useState(holdings[0]?.symbol ?? "");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -53,7 +53,9 @@ export function AnalystPanel({ holdings }: { holdings: Holding[] }) {
     return () => {
       cancelled = true;
     };
-  }, [symbol]);
+    // refreshTick bumps every 5 min to pick up newly-cached ratings without forcing a re-scrape.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbol, refreshTick]);
 
   const a = data?.analysts;
   const up = data?.upsidePct ?? null;
