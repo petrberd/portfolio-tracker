@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { InfoTip } from "@/components/InfoTip";
+import { SemiGauge } from "@/components/Gauge";
 
 const money = (v: number, ccy: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy || "USD", maximumFractionDigits: 2 }).format(v ?? 0);
@@ -35,46 +36,16 @@ function zoneFor(upsidePct: number) {
   return GAUGE_ZONES.find((z) => upsidePct < z.max) ?? GAUGE_ZONES[GAUGE_ZONES.length - 1];
 }
 
-/** Point on the gauge's semicircle at angle `g` (0 = left end, 180 = right end). */
-function gaugePoint(cx: number, cy: number, r: number, g: number) {
-  const theta = ((180 - g) * Math.PI) / 180;
-  return { x: cx + r * Math.cos(theta), y: cy - r * Math.sin(theta) };
-}
-
 /** Mirrored "fair value" gauge: strongly undervalued on the right, overvalued on the left. */
 function FairPriceGauge({ upsidePct }: { upsidePct: number }) {
-  const cx = 110,
-    cy = 100,
-    r = 84;
-  const gapDeg = 3;
-  const bands = [0, 36, 72, 108, 144, 180];
-  const needleG = ((Math.max(-GAUGE_CLAMP, Math.min(GAUGE_CLAMP, upsidePct)) + GAUGE_CLAMP) / (2 * GAUGE_CLAMP)) * 180;
-  const needleTip = gaugePoint(cx, cy, r - 18, needleG);
-  const fairTick = gaugePoint(cx, cy, r + 10, 90);
-
   return (
-    <svg viewBox="0 0 220 120" className="w-full max-w-[240px] mx-auto">
-      {bands.slice(0, 5).map((g0, i) => {
-        const g1 = bands[i + 1];
-        const p0 = gaugePoint(cx, cy, r, g0 + gapDeg / 2);
-        const p1 = gaugePoint(cx, cy, r, g1 - gapDeg / 2);
-        return (
-          <path
-            key={i}
-            d={`M ${p0.x} ${p0.y} A ${r} ${r} 0 0 1 ${p1.x} ${p1.y}`}
-            stroke={GAUGE_ZONES[i].color}
-            strokeWidth={14}
-            strokeLinecap="round"
-            fill="none"
-          />
-        );
-      })}
-      {/* "Fair price" tick above the middle (yellow) band */}
-      <line x1={cx} y1={cy - r + 4} x2={fairTick.x} y2={fairTick.y} stroke="#8b98b8" strokeWidth={2} />
-      {/* Needle */}
-      <line x1={cx} y1={cy} x2={needleTip.x} y2={needleTip.y} stroke="#e5e7eb" strokeWidth={3} strokeLinecap="round" />
-      <circle cx={cx} cy={cy} r={6} fill="#e5e7eb" />
-    </svg>
+    <SemiGauge
+      zones={GAUGE_ZONES.map((z) => z.color)}
+      value={upsidePct}
+      min={-GAUGE_CLAMP}
+      max={GAUGE_CLAMP}
+      showTopTick
+    />
   );
 }
 

@@ -12,6 +12,7 @@ import {
   PALETTE,
 } from "@/components/Charts";
 import { AnalystPanel } from "@/components/Analysts";
+import { MarketMood } from "@/components/MarketMood";
 import { StockDetail } from "@/components/StockDetail";
 import { DividendCalendar } from "@/components/DividendCalendar";
 import { InfoTip } from "@/components/InfoTip";
@@ -296,6 +297,17 @@ export default function Page() {
             </div>
           )}
           {benchmark.length ? <BenchmarkChart data={benchmark} /> : <Empty msg="Benchmark se nepodařilo načíst." />}
+        </Section>
+      </div>
+
+      {/* Market mood (VIX) */}
+      <div className="mt-6">
+        <Section
+          title="Nálada trhu"
+          subtitle="VIX — index očekávané volatility S&P 500 („index strachu“)"
+          hint="VIX měří implikovanou volatilitu opcí na S&P 500 na příštích 30 dní — čím vyšší, tím víc trh čeká výkyvy (strach); nízký VIX = klid. Pásma jsou obecně používaný odhad, ne oficiální klasifikace CBOE."
+        >
+          <MarketMood refreshTick={refreshTick} />
         </Section>
       </div>
 
