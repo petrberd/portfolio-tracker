@@ -49,11 +49,7 @@ export function EarningsCalendar({ refreshTick = 0 }: { refreshTick?: number }) 
           ))}
         </tbody>
       </table>
-      <p className="text-muted text-[11px] mt-3">
-        Zdroj: stockanalysis.com. Datum bez „(odhad)" je jimi uváděné jako aktuální; „(odhad)" znamená, že poslední známé
-        datum už bylo v minulosti a appka ho promítla o ~91 dní dopředu (typická čtvrtletní kadence) — skutečné datum
-        oznámí firma obvykle až pár týdnů předem.
-      </p>
+      <p className="text-muted text-[11px] mt-2">Zdroj: stockanalysis.com. „(odhad)" = promítnuto o ~91 dní dopředu.</p>
     </div>
   );
 }

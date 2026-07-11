@@ -13,7 +13,6 @@ import {
 } from "@/components/Charts";
 import { AnalystPanel } from "@/components/Analysts";
 import { EarningsCalendar } from "@/components/EarningsCalendar";
-import { SmartMoney } from "@/components/SmartMoney";
 import { MarketMood } from "@/components/MarketMood";
 import { StockDetail } from "@/components/StockDetail";
 import { DividendCalendar } from "@/components/DividendCalendar";
@@ -315,7 +314,7 @@ export default function Page() {
 
       {/* Allocation + holdings */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
-        <div className="lg:col-span-2 min-w-0">
+        <div className="lg:col-span-2 min-w-0 space-y-6">
           <Section
             title="Alokace portfolia"
             subtitle="Podle tržní hodnoty"
@@ -334,6 +333,9 @@ export default function Page() {
           >
             {alloc.length ? <AllocationPie data={alloc} /> : <Empty msg="Žádné otevřené pozice." />}
           </Section>
+          <Section title="Earnings kalendář" subtitle="Nejbližší termín výsledků">
+            <EarningsCalendar refreshTick={refreshTick} />
+          </Section>
         </div>
         <div className="lg:col-span-3 min-w-0">
           <Section title="Pozice" subtitle="Klikni na titul pro detail, graf s tvými obchody a novinky">
@@ -345,28 +347,6 @@ export default function Page() {
       {/* Analyst forecasts & ratings */}
       <div className="mt-6">
         <AnalystPanel holdings={holdings.map((h) => ({ symbol: h.symbol, instrument: h.instrument }))} refreshTick={refreshTick} />
-      </div>
-
-      {/* Earnings calendar */}
-      <div className="mt-6">
-        <Section
-          title="Earnings kalendář"
-          subtitle="Nejbližší termín výsledků pro každý titul v portfoliu"
-          hint="Kde stockanalysis.com uvádí datum v budoucnosti, bereme ho přímo. Kde je poslední známé datum už v minulosti (web ho ještě nestihl posunout), appka ho odhadne o ~91 dní dopředu a označí (odhad)."
-        >
-          <EarningsCalendar refreshTick={refreshTick} />
-        </Section>
-      </div>
-
-      {/* Smart money: 13F super-investor moves + insider Form 4 trades */}
-      <div className="mt-6">
-        <Section
-          title="Smart Money"
-          subtitle="Sleduj obchody super investorů a insiderů (SEC EDGAR)"
-          hint="13F filings ukazují držbu top fondů se zpožděním až 45 dní po konci čtvrtletí — je to stav pozice, ne živý obchod. Form 4 u insiderů (P/S) je aktuálnější, ale jde jen o pár vybraných lidí, ne kompletní přehled."
-        >
-          <SmartMoney refreshTick={refreshTick} />
-        </Section>
       </div>
 
       {/* Dividends + deposits */}
