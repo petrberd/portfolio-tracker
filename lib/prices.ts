@@ -9,6 +9,7 @@ import { readJson, writeJson } from "./storage";
 
 const CACHE_KEY = "prices.json";
 const TTL_MS = 60 * 60 * 1000; // 1h auto-refresh; the "Obnovit ceny" button forces fresh
+const SYMBOL_MAP_KEY = "symbolMap.json"; // raw ticker -> resolved Yahoo symbol, cached indefinitely
 
 export interface DailyClose {
   date: string; // YYYY-MM-DD
@@ -56,6 +57,73 @@ export function yahooSymbol(xtbTicker: string): string {
   return base; // best effort
 }
 
+let symbolMap: Record<string, string> | null = null;
+async function loadSymbolMap(): Promise<Record<string, string>> {
+  if (symbolMap) return symbolMap;
+  symbolMap = (await readJson<Record<string, string>>(SYMBOL_MAP_KEY)) ?? {};
+  return symbolMap;
+}
+async function saveSymbolMap(): Promise<void> {
+  if (symbolMap) await writeJson(SYMBOL_MAP_KEY, symbolMap);
+}
+
+/**
+ * Resolves a bare ticker (no exchange suffix — e.g. Revolut's export, or an
+ * XTB exchange not in yahooSymbol()'s allowlist) to the Yahoo symbol that
+ * actually has data, via Yahoo's own search/autocomplete endpoint. Tries the
+ * symbol as-is first (works for the common case — plain US tickers), and
+ * only falls back to search if that returns no history. The result is cached
+ * indefinitely (a ticker's exchange doesn't change), so the search only runs
+ * once per symbol ever, not once per hour like the price cache.
+ *
+ * Verified empirically against real Revolut-held European ETFs: searching
+ * "4COP" and "CEBS" returns "4COP.DE"/"CEBS.DE" as the top (most relevant)
+ * match, which is also the symbol that actually has price data — general
+ * enough to cover exchanges outside yahooSymbol()'s hardcoded suffix map,
+ * unlike a single hardcoded fallback suffix.
+ */
+async function resolveSymbol(raw: string): Promise<string> {
+  if (!raw) return raw;
+  const map = await loadSymbolMap();
+  if (map[raw]) return map[raw];
+
+  const hasData = async (sym: string): Promise<boolean> => {
+    try {
+      const res = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=5d`,
+        { headers: { "User-Agent": "Mozilla/5.0" } }
+      );
+      if (!res.ok) return false;
+      const json: any = await res.json();
+      return !!json?.chart?.result?.[0]?.timestamp?.length;
+    } catch {
+      return false;
+    }
+  };
+
+  if (await hasData(raw)) return raw; // works as-is — nothing to cache, this is the default path
+
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(raw)}&quotesCount=5&newsCount=0`,
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+    if (res.ok) {
+      const json: any = await res.json();
+      for (const q of json?.quotes ?? []) {
+        if (q.symbol && (await hasData(q.symbol))) {
+          map[raw] = q.symbol;
+          await saveSymbolMap();
+          return q.symbol;
+        }
+      }
+    }
+  } catch (e) {
+    console.error(`resolveSymbol search failed for ${raw}`, e);
+  }
+  return raw; // give up — caller's own fetch will fail the same way it would have without this
+}
+
 async function fetchChartRaw(symbol: string): Promise<Chart | null> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
     symbol
@@ -84,14 +152,9 @@ async function fetchChartRaw(symbol: string): Promise<Chart | null> {
 
 /**
  * Fetch (and cache) the chart for one symbol. `force` bypasses the cache.
- *
- * If the bare symbol has no data (empty history — Yahoo needs an exchange
- * suffix for most non-US listings) and it doesn't already carry one, retries
- * once with `.DE` (Xetra). This matters for brokers like Revolut whose export
- * gives no exchange info at all, unlike XTB's own suffixed tickers — verified
- * empirically against two real Revolut-held European ETFs that only resolved
- * as e.g. "4COP.DE"/"CEBS.DE", not the bare ticker. Best-effort, not a general
- * solution for every exchange (see lib/parseRevolut.ts).
+ * Resolves the symbol first (see resolveSymbol) so bare tickers without an
+ * exchange suffix — Revolut's export, or an XTB exchange not in
+ * yahooSymbol()'s allowlist — still find the right Yahoo listing.
  */
 export async function fetchChart(symbol: string, force = false): Promise<Chart | null> {
   if (!symbol) return null;
@@ -99,10 +162,8 @@ export async function fetchChart(symbol: string, force = false): Promise<Chart |
   const hit = c[symbol];
   if (!force && hit && Date.now() - hit.fetchedAt < TTL_MS) return hit.chart;
   try {
-    let chart = await fetchChartRaw(symbol).catch(() => null);
-    if ((!chart || !chart.closes.length) && !symbol.includes(".")) {
-      chart = await fetchChartRaw(`${symbol}.DE`).catch(() => null);
-    }
+    const resolved = await resolveSymbol(symbol);
+    const chart = await fetchChartRaw(resolved).catch(() => null);
     if (chart && chart.closes.length) {
       c[symbol] = { fetchedAt: Date.now(), chart };
       await saveCache();
@@ -117,13 +178,16 @@ export async function fetchChart(symbol: string, force = false): Promise<Chart |
 
 /**
  * Daily closes for a shorter range (e.g. "2y"), fetched fresh — `range=max`
- * returns only monthly granularity, too coarse for a detail chart.
+ * returns only monthly granularity, too coarse for a detail chart. Resolves
+ * the symbol the same way fetchChart does (shared cache, so this is a no-op
+ * lookup once fetchChart has already resolved it for this ticker).
  */
 export async function fetchDailyCloses(symbol: string, range = "2y"): Promise<DailyClose[]> {
   if (!symbol) return [];
   try {
+    const resolved = await resolveSymbol(symbol);
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      symbol
+      resolved
     )}?interval=1d&range=${range}`;
     const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 3600 } });
     if (!res.ok) throw new Error(`Yahoo HTTP ${res.status}`);
