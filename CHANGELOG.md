@@ -4,6 +4,24 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.8.0] — 2026-07-12
+
+### Added
+- **Notifikace prohlížeče (Chrome) pro cenové alerty** — u sledovaných titulů i vlastních
+  pozic jde teď povolit systémovou notifikaci Chromu, která se odešle při prvním dosažení
+  cíle (`lib/notifyAlerts.ts`, dedup přes localStorage, takže se nespamuje při každém
+  5minutovém obnovení). Alert zůstává i vizuální (badge „🔔 Cíl dosažen"), notifikace je
+  navíc — funguje jen dokud je appka otevřená v prohlížeči, žádný backend na pozadí.
+  Na iPhonu (iOS) nefunguje kvůli omezení Web Notification API v mobilních prohlížečích.
+- **Cenové alerty na vlastních pozicích** — sekce „Pozice" teď má stejný alert mechanismus
+  jako wishlist (`lib/holdingAlerts.ts`, `app/api/holding-alerts`, `data/holdingAlerts.json`,
+  klíčováno Yahoo symbolem, ne watch-listem). `/api/portfolio` obohacen o `alert` +
+  `alertTriggered` na každé pozici.
+
+### Changed
+- `lib/priceAlert.ts` — sdílený `PriceAlert` typ + `alertTriggered()` mezi wishlistem a
+  pozicemi (dřív jen ve `lib/wishlist.ts`).
+
 ## [1.7.0] — 2026-07-12
 
 ### Added

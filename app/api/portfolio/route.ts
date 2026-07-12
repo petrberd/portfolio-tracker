@@ -5,6 +5,8 @@ import { fetchQuote, fetchFxCzk } from "@/lib/prices";
 import { buildValueSeries, computePerformance, computeRiskMetrics, buildBenchmark } from "@/lib/timeseries";
 import { fetchSector } from "@/lib/sector";
 import { loadCash, freeCashTotal } from "@/lib/cash";
+import { loadHoldingAlerts } from "@/lib/holdingAlerts";
+import { alertTriggered, type PriceAlert } from "@/lib/priceAlert";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +21,8 @@ export interface EnrichedHolding extends Holding {
   sector: string;
   dividendTtmCzk: number; // net dividends received in the trailing 12 months
   yieldOnCostPct: number; // TTM dividend / cost basis
+  alert?: PriceAlert;
+  alertTriggered: boolean;
 }
 
 /** Net dividends (Dividend + Withholding tax) per ticker over the trailing 12 months. */
@@ -59,6 +63,7 @@ export async function GET(req: NextRequest) {
   // Sector per holding (stockanalysis.com, cached, no API key needed) + trailing-12m dividends (from export).
   const sectors = await Promise.all(summary.holdings.map((h) => fetchSector(h.symbol)));
   const divTtm = trailingDividends(stored);
+  const holdingAlerts = await loadHoldingAlerts();
 
   const holdings: EnrichedHolding[] = summary.holdings.map((h, i) => {
     const q = quotes[i];
@@ -66,6 +71,7 @@ export async function GET(req: NextRequest) {
     const marketValueCzk = h.shares * q.price * rate;
     const unrealizedPnlCzk = marketValueCzk - h.czkCostBasis;
     const dividendTtmCzk = divTtm.get(h.ticker) ?? 0;
+    const alert = holdingAlerts[h.symbol];
     return {
       ...h,
       currency: q.currency,
@@ -77,6 +83,8 @@ export async function GET(req: NextRequest) {
       sector: sectors[i] ?? "Ostatní",
       dividendTtmCzk,
       yieldOnCostPct: h.czkCostBasis > 0 ? (dividendTtmCzk / h.czkCostBasis) * 100 : 0,
+      alert,
+      alertTriggered: alertTriggered(alert, q.price),
     };
   });
 

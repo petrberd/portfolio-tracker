@@ -66,19 +66,35 @@ Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind 
   12 měsíců (okno od PŘÍŠTÍHO měsíce, ne aktuálního — current month bývá částečně pryč). Fallback
   řetězec: Nasdaq (reálné, jen Nasdaq-listed) → stockanalysis.com (reálné, i NYSE) → Yahoo
   (ex reálné, pay odhad).
+- `lib/priceAlert.ts` — sdílený `PriceAlert` typ (`targetPrice` + `direction`) a čistá
+  `alertTriggered()` funkce, používané jak wishlistem, tak pozicemi (níže).
 - `lib/wishlist.ts` — sledované tituly mimo portfolio (symbol, jméno, volitelný alert
   target/direction) v `data/wishlist.json`. Read-modify-write mutace serializované přes promise
   frontu (stejný vzor jako sectionVisibility/sectionOrder níže) — bez toho by dva rychlé zápisy
   za sebou mohly jeden druhého přepsat (byl to reálný bug, opraveno).
+- `lib/holdingAlerts.ts` — stejný alert mechanismus jako wishlist, ale pro VLASTNĚNÉ pozice,
+  klíčováno Yahoo symbolem (`data/holdingAlerts.json`), ne watch-listem — appka nemá důvod
+  nutit uživatele přidat vlastní pozici do wishlistu, jen aby na ni mohl nastavit alert.
+  `/api/portfolio` obohacuje každou pozici o `alert` + `alertTriggered` (viz
+  `app/api/holding-alerts` pro PATCH set/clear).
+- `lib/notifyAlerts.ts` — klientský (browser) helper sdílený `components/Wishlist.tsx` a
+  `app/page.tsx`: jakmile se alert poprvé spustí (`triggered: true`), pošle
+  `new Notification(...)` (pokud má uživatel povolené prohlížečové notifikace). Dedup přes
+  localStorage klíčovaný `symbol:cena:směr`, aby appka nespamovala při každém 5minutovém
+  refreshi, dokud cena zůstává za cílem — a znovu spustila, když se alert zruší/změní a pak
+  znovu naplní podmínku. Notifikace funguje jen dokud je appka otevřená v prohlížeči (žádný
+  backend na pozadí) a **nefunguje na iPhonu/iOS** (Web Notification API tam mobilní
+  prohlížeče nepodporují mimo instalovanou PWA).
 - `lib/sectionVisibility.ts` / `lib/sectionOrder.ts` — které sekce dashboardu jsou skryté a v jakém
   pořadí se zobrazují (`data/sectionVisibility.json`, `data/sectionOrder.json`), stejná
   serializovaná read-modify-write ochrana. Persistováno na serveru (ne localStorage), aby se
   nastavení drželo napříč zařízeními.
 - API routy: `app/api/{import,portfolio,analysts,stockdetail,dividends,earnings,market,wishlist,
-  section-visibility,section-order}` — čtou libs, cachují do `data/*.json`. `wishlist/search`
-  (autocomplete přes `searchSymbols()` v `lib/prices.ts`) a `wishlist`, `section-visibility`,
-  `section-order` NEJSOU v `middleware.ts`'s `PUBLIC_PATHS` — zůstávají za Basic Authem, protože
-  jde o osobní data/preference, ne obecné tržní info.
+  holding-alerts,section-visibility,section-order}` — čtou libs, cachují do `data/*.json`.
+  `wishlist/search` (autocomplete přes `searchSymbols()` v `lib/prices.ts`) a `wishlist`,
+  `holding-alerts`, `section-visibility`, `section-order` NEJSOU v `middleware.ts`'s
+  `PUBLIC_PATHS` — zůstávají za Basic Authem, protože jde o osobní data/preference, ne obecné
+  tržní info.
 - UI: `app/page.tsx` (dashboard) + `components/` (Charts, Analysts, StockDetail, DividendCalendar,
   EarningsCalendar, MarketMood, Wishlist, Gauge — sdílený semicircle gauge pro Férovou cenu i VIX;
   PortfolioUI — sdílené Kpi/Section/HoldingsTable/atd. pro `/` i `/demo`; SectionVisibility a
@@ -195,8 +211,16 @@ Vždy nejdřív ověř dostupnost dat (prostředí blokuje zdroje), teprve pak s
   hesla na `/demo` (viz README a sekci Demo níže). Repo: github.com/petrberd/portfolio-tracker.
 - **Git stav:** `main` je s `origin/main` sesynchronizované (poslední push obsahoval mobilní
   UX revizi + skeleton loading v1.3.0, senior UX/UI pass v1.4.0, veřejné demo + drobné opravy
-  v1.5.0, odstranění Finnhubu/API klíče v1.6.0, a wishlist + skrývání/přesouvání sekcí v1.7.0).
-  Tagy `v1.0.0`–`v1.7.0` jsou všechny pushnuté.
+  v1.5.0, odstranění Finnhubu/API klíče v1.6.0, wishlist + skrývání/přesouvání sekcí v1.7.0,
+  a notifikace prohlížeče + alerty na pozicích v1.8.0). Tagy `v1.0.0`–`v1.7.0` jsou pushnuté;
+  `v1.8.0` viz commit historie (může být pushnutý s `[skip netlify]`, aby nespustil deploy).
+- **Notifikace prohlížeče pro alerty (v1.8.0)** — Petr to nejdřív testoval bez povoleného
+  systémového oprávnění (macOS Nastavení → Oznámení → Chrome bylo vypnuté) a bez restartu
+  Chromu po zapnutí — obojí bylo potřeba, appka sama fungovala správně od začátku. Ověřeno
+  reálně v Chromu, žádost o macOS system-level notification permission se needitovala v appce.
+  **iPhone Chrome nefunguje** (iOS nepodporuje Web Notification API mimo instalovanou PWA) —
+  Petr to zatím neřeší, věděl o omezení. Případné budoucí rozšíření by šlo přes Netlify
+  Scheduled Function + Web Push (VAPID, zdarma) — probráno, neimplementováno.
 - **Revolut import je live-otestovaný** na reálném vzorku uživatele (6 transakcí: CASH TOP-UP, BUY,
   DIVIDEND) — funguje včetně sloučení s XTB, EUR měny, a nedostupných tickerů (4COP, CEBS = evropské
   ETF, vyřešeno Yahoo search fallbackem).

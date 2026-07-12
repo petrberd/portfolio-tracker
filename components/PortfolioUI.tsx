@@ -5,11 +5,15 @@
 // Next.js's typed-routes build fails if a page.tsx file has any named exports
 // beyond its default component and the reserved route-config exports.
 
+import { Fragment, useState } from "react";
 import { czk, num, pct, shortDate } from "@/lib/format";
 import { PALETTE } from "@/components/Charts";
 import { InfoTip } from "@/components/InfoTip";
 import { IconButton } from "@/components/IconButton";
 import { holdingTaxStatus } from "@/lib/taxtest";
+
+const money = (v: number, ccy: string) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: ccy || "USD", maximumFractionDigits: 2 }).format(v ?? 0);
 
 /** "YYYY-MM" shifted by `n` months (n can be negative). */
 export function addMonths(yyyyMm: string, n: number): string {
@@ -132,11 +136,31 @@ export function HoldingsTable({
   holdings,
   total,
   onSelect,
+  onAlertChange,
 }: {
   holdings: any[];
   total: number;
   onSelect: (h: { ticker: string; instrument: string }) => void;
+  /** Omitted on /demo — when absent the per-row alert UI (and its own row expansion) is hidden. */
+  onAlertChange?: (symbol: string, alert: { targetPrice: number; direction: "above" | "below" } | null) => void;
 }) {
+  const [editingSymbol, setEditingSymbol] = useState<string | null>(null);
+  const [alertPrice, setAlertPrice] = useState("");
+  const [alertDir, setAlertDir] = useState<"above" | "below">("above");
+
+  const openAlertEditor = (h: any) => {
+    setEditingSymbol(h.symbol);
+    setAlertPrice(h.alert ? String(h.alert.targetPrice) : h.livePrice ? h.livePrice.toFixed(2) : "");
+    setAlertDir(h.alert?.direction ?? "above");
+  };
+
+  const saveAlert = (symbol: string) => {
+    const price = parseFloat(alertPrice.replace(",", "."));
+    if (!Number.isFinite(price) || price <= 0) return;
+    onAlertChange?.(symbol, { targetPrice: price, direction: alertDir });
+    setEditingSymbol(null);
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -151,57 +175,125 @@ export function HoldingsTable({
           </tr>
         </thead>
         <tbody>
-          {holdings.map((h, i) => (
-            <tr
-              key={h.ticker}
-              onClick={() => onSelect({ ticker: h.ticker, instrument: h.instrument })}
-              className="border-b border-line/50 hover:bg-panel2/40 cursor-pointer"
-            >
-              <td className="py-2.5">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-2 h-2 rounded-full shrink-0 mt-0.5 self-start" style={{ background: PALETTE[i % PALETTE.length] }} />
-                  <div className="min-w-0">
-                    <div className="font-medium">{h.instrument}</div>
-                    <div className="text-muted text-xs">{h.ticker}</div>
-                    {/* Mobile-only: the columns hidden below sm are folded in here so nothing is lost. */}
-                    <div className="sm:hidden flex flex-wrap items-center gap-x-2 gap-y-0.5 text-muted text-[11px] mt-1">
-                      <span>{num(h.shares, 4)} ks</span>
-                      {h.avgNativePrice && <span>⌀ {num(h.avgNativePrice)} {h.currency}</span>}
-                      {h.livePrice && (
-                        <span>
-                          {num(h.livePrice)} {h.currency}
-                          {h.dayChangePercent ? (
-                            <span className={h.dayChangePercent >= 0 ? "text-pos" : "text-neg"}> {pct(h.dayChangePercent)}</span>
-                          ) : null}
-                        </span>
-                      )}
-                      {total > 0 && <span>{((h.marketValueCzk / total) * 100).toFixed(1)} % podílu</span>}
+          {holdings.map((h, i) => {
+            const rowClick = () => onSelect({ ticker: h.ticker, instrument: h.instrument });
+            return (
+              <Fragment key={h.ticker}>
+                <tr className={`border-b border-line/50 ${h.alertTriggered ? "bg-pos/5" : ""}`}>
+                  <td className="py-2.5 cursor-pointer hover:bg-panel2/40" onClick={rowClick}>
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-2 h-2 rounded-full shrink-0 mt-0.5 self-start" style={{ background: PALETTE[i % PALETTE.length] }} />
+                      <div className="min-w-0">
+                        <div className="font-medium">{h.instrument}</div>
+                        <div className="text-muted text-xs">{h.ticker}</div>
+                        {/* Mobile-only: the columns hidden below sm are folded in here so nothing is lost. */}
+                        <div className="sm:hidden flex flex-wrap items-center gap-x-2 gap-y-0.5 text-muted text-[11px] mt-1">
+                          <span>{num(h.shares, 4)} ks</span>
+                          {h.avgNativePrice && <span>⌀ {num(h.avgNativePrice)} {h.currency}</span>}
+                          {h.livePrice && (
+                            <span>
+                              {num(h.livePrice)} {h.currency}
+                              {h.dayChangePercent ? (
+                                <span className={h.dayChangePercent >= 0 ? "text-pos" : "text-neg"}> {pct(h.dayChangePercent)}</span>
+                              ) : null}
+                            </span>
+                          )}
+                          {total > 0 && <span>{((h.marketValueCzk / total) * 100).toFixed(1)} % podílu</span>}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </td>
-              <td className="hidden sm:table-cell text-right tabular-nums">
-                {num(h.shares, 4)}
-                <div className="text-muted text-xs">
-                  {h.avgNativePrice ? `⌀ ${num(h.avgNativePrice)} ${h.currency}` : "—"}
-                </div>
-              </td>
-              <td className="hidden sm:table-cell text-right tabular-nums">
-                {h.livePrice ? `${num(h.livePrice)} ${h.currency}` : "—"}
-                {h.dayChangePercent ? (
-                  <div className={`text-xs ${h.dayChangePercent >= 0 ? "text-pos" : "text-neg"}`}>{pct(h.dayChangePercent)}</div>
-                ) : null}
-              </td>
-              <td className="text-right tabular-nums">{czk(h.marketValueCzk)}</td>
-              <td className={`text-right tabular-nums ${h.unrealizedPnlCzk >= 0 ? "text-pos" : "text-neg"}`}>
-                <div>{czk(h.unrealizedPnlCzk)}</div>
-                <div className="text-xs">{pct(h.unrealizedPnlPct)}</div>
-              </td>
-              <td className="hidden sm:table-cell text-right tabular-nums text-muted">
-                {total > 0 ? `${((h.marketValueCzk / total) * 100).toFixed(1)} %` : "—"}
-              </td>
-            </tr>
-          ))}
+                  </td>
+                  <td className="hidden sm:table-cell text-right tabular-nums cursor-pointer hover:bg-panel2/40" onClick={rowClick}>
+                    {num(h.shares, 4)}
+                    <div className="text-muted text-xs">
+                      {h.avgNativePrice ? `⌀ ${num(h.avgNativePrice)} ${h.currency}` : "—"}
+                    </div>
+                  </td>
+                  <td className="hidden sm:table-cell text-right tabular-nums cursor-pointer hover:bg-panel2/40" onClick={rowClick}>
+                    {h.livePrice ? `${num(h.livePrice)} ${h.currency}` : "—"}
+                    {h.dayChangePercent ? (
+                      <div className={`text-xs ${h.dayChangePercent >= 0 ? "text-pos" : "text-neg"}`}>{pct(h.dayChangePercent)}</div>
+                    ) : null}
+                  </td>
+                  <td className="text-right tabular-nums cursor-pointer hover:bg-panel2/40" onClick={rowClick}>
+                    {czk(h.marketValueCzk)}
+                  </td>
+                  <td
+                    className={`text-right tabular-nums cursor-pointer hover:bg-panel2/40 ${h.unrealizedPnlCzk >= 0 ? "text-pos" : "text-neg"}`}
+                    onClick={rowClick}
+                  >
+                    <div>{czk(h.unrealizedPnlCzk)}</div>
+                    <div className="text-xs">{pct(h.unrealizedPnlPct)}</div>
+                  </td>
+                  <td className="hidden sm:table-cell text-right tabular-nums text-muted cursor-pointer hover:bg-panel2/40" onClick={rowClick}>
+                    {total > 0 ? `${((h.marketValueCzk / total) * 100).toFixed(1)} %` : "—"}
+                  </td>
+                </tr>
+                {onAlertChange && (
+                  <tr className="border-b border-line/50">
+                    <td colSpan={6} className="pb-2.5 pt-0 pl-4">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {h.alertTriggered && (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg text-pos bg-pos/10">
+                            🔔 Cíl dosažen
+                          </span>
+                        )}
+                        {editingSymbol === h.symbol ? (
+                          <>
+                            <select
+                              value={alertDir}
+                              onChange={(e) => setAlertDir(e.target.value as "above" | "below")}
+                              className="bg-panel2 border border-line rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-brand"
+                            >
+                              <option value="above">při růstu nad</option>
+                              <option value="below">při poklesu pod</option>
+                            </select>
+                            <input
+                              value={alertPrice}
+                              onChange={(e) => setAlertPrice(e.target.value)}
+                              inputMode="decimal"
+                              className="w-24 bg-panel2 border border-line rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-brand"
+                            />
+                            <button
+                              onClick={() => saveAlert(h.symbol)}
+                              className="text-xs px-2.5 py-1.5 rounded-lg bg-brand text-white hover:opacity-90 transition"
+                            >
+                              Uložit
+                            </button>
+                            <button
+                              onClick={() => setEditingSymbol(null)}
+                              className="text-xs px-2 py-1.5 rounded-lg text-muted hover:bg-panel2 transition"
+                            >
+                              Zrušit
+                            </button>
+                          </>
+                        ) : h.alert ? (
+                          <>
+                            <button
+                              onClick={() => openAlertEditor(h)}
+                              className="text-xs px-2 py-1 rounded-lg border border-line text-muted hover:bg-panel2 transition"
+                            >
+                              Alert {h.alert.direction === "above" ? "≥" : "≤"} {money(h.alert.targetPrice, h.currency)}
+                            </button>
+                            <button onClick={() => onAlertChange(h.symbol, null)} className="text-xs text-muted hover:text-neg transition">
+                              zrušit
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => openAlertEditor(h)}
+                            className="text-xs px-2 py-1 rounded-lg border border-line text-muted hover:bg-panel2 transition"
+                          >
+                            + Nastavit alert
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>

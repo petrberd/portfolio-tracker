@@ -35,6 +35,7 @@ import {
   Splash,
   Empty,
 } from "@/components/PortfolioUI";
+import { notifyPriceAlerts } from "@/lib/notifyAlerts";
 
 type Data = any;
 // Every chart's upper end is "today", computed fresh on each request from live data, so
@@ -72,6 +73,7 @@ function PageContent() {
   const [justRefreshed, setJustRefreshed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const revolutFileRef = useRef<HTMLInputElement>(null);
+  const holdingNotifiedRef = useRef<Set<string> | null>(null);
 
   const load = useCallback(async (force = false) => {
     force ? setRefreshing(true) : setLoading(true);
@@ -87,6 +89,19 @@ function PageContent() {
         json = await res.json();
       }
       setData(json);
+      if (json.holdings) {
+        notifyPriceAlerts(
+          json.holdings.map((h: any) => ({
+            symbol: h.symbol,
+            name: h.instrument,
+            alert: h.alert,
+            triggered: h.alertTriggered,
+            price: h.livePrice,
+            currency: h.currency,
+          })),
+          holdingNotifiedRef
+        );
+      }
       // Brief visible confirmation that "Obnovit ceny" actually did something —
       // otherwise the button just silently reverts to its idle label.
       if (force) {
@@ -113,6 +128,15 @@ function PageContent() {
     }, 5 * 60 * 1000);
     return () => clearInterval(id);
   }, [load]);
+
+  const setHoldingAlert = async (symbol: string, alert: { targetPrice: number; direction: "above" | "below" } | null) => {
+    await fetch("/api/holding-alerts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(alert ? { symbol, ...alert } : { symbol, clear: true }),
+    });
+    await load();
+  };
 
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>, broker: "xtb" | "revolut" = "xtb") => {
     const file = e.target.files?.[0];
@@ -418,7 +442,12 @@ function PageContent() {
                         subtitle="Klikni na titul pro detail, graf s tvými obchody a novinky"
                         onHide={() => hide("holdings", "Pozice")}
                       >
-                        <HoldingsTable holdings={holdings} total={s.totalMarketValue} onSelect={setDetail} />
+                        <HoldingsTable
+                          holdings={holdings}
+                          total={s.totalMarketValue}
+                          onSelect={setDetail}
+                          onAlertChange={setHoldingAlert}
+                        />
                       </Section>
                     )}
                   </div>

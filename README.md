@@ -132,8 +132,13 @@ reálné riziko je zanedbatelné.
 - **Sledované tituly (wishlist)** — přidej libovolný titul mimo portfolio podle tickeru
   nebo názvu firmy (autocomplete přes Yahoo search). U ceny rovnou vidíš i cíl analytiků
   a potenciál v %; klik otevře stejný detail jako u vlastní pozice (bez tvých obchodů).
-  Volitelný cenový alert (nad/pod cílovou cenou) — čistě vizuální zvýraznění při dosažení,
-  kontroluje se při načtení stránky/obnovení cen, appka nemá backend na push notifikace.
+- **Cenové alerty** — u sledovaných titulů i přímo u vlastních pozic (sekce „Pozice") jde
+  nastavit cenový alert (nad/pod cílovou cenou): vizuální zvýraznění „🔔 Cíl dosažen" při
+  dosažení, plus volitelná **notifikace prohlížeče (Chrome)** — po povolení appka pošle
+  systémovou notifikaci, jakmile se alert poprvé spustí (kontroluje se při načtení stránky
+  a při automatickém obnovení cen každých 5 minut). Appka nemá backend na pozadí, takže
+  notifikace přijde jen dokud běží prohlížeč a appka je otevřená alespoň v jedné záložce —
+  na iPhonu (iOS) to kvůli omezení Web Notification API v mobilních prohlížečích nefunguje.
 
 Sektor i insider obchody jedou přes bezplatné zdroje bez API klíče (stockanalysis.com, Nasdaq).
 Institucionální držba a cílové ceny nad rámec analytického konsenzu se nedělají — appka nemá
@@ -202,6 +207,7 @@ Lokálně v `data/` (gitignored), na Netlify přes Netlify Blobs (`lib/storage.t
   stažení; TTL se liší modul od modulu, viz komentáře v `lib/`).
 - `cash.json` — externí spořicí účty (volitelné, `.env.example`/README výše).
 - `wishlist.json` — sledované tituly mimo portfolio + jejich alerty.
+- `holdingAlerts.json` — cenové alerty na vlastních pozicích (klíčováno Yahoo symbolem).
 - `sectionVisibility.json`, `sectionOrder.json` — které sekce dashboardu jsou skryté a
   v jakém pořadí se zobrazují (viz „Přizpůsobení dashboardu" výše).
 

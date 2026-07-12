@@ -1,19 +1,20 @@
 import { readJson, writeJson } from "./storage";
+import { alertTriggered, type PriceAlert } from "./priceAlert";
 
 /**
  * Watchlist of tickers the user doesn't (necessarily) own — add any stock by
  * name/ticker, see its live detail (same StockDetail modal as a real holding),
- * and optionally set a target-price alert. Alerts are visual-only (no
- * background worker/push infra): the item just highlights once its live
- * price crosses the target, checked whenever the wishlist is loaded.
+ * and optionally set a target-price alert. Alerts are visual-only server-side
+ * (no background worker/push infra): the item just highlights once its live
+ * price crosses the target, checked whenever the wishlist is loaded. The
+ * client (see components/Wishlist.tsx) additionally fires a browser
+ * Notification the first time an alert trips, as long as the tab stays open.
  */
 
 const CACHE_KEY = "wishlist.json";
 
-export interface WishlistAlert {
-  targetPrice: number;
-  direction: "above" | "below";
-}
+export type WishlistAlert = PriceAlert;
+export { alertTriggered };
 
 export interface WishlistItem {
   symbol: string; // Yahoo symbol, already resolved (from searchSymbols)
@@ -77,9 +78,4 @@ export function setWishlistAlert(symbol: string, alert: WishlistAlert | null): P
     }
     return items;
   });
-}
-
-export function alertTriggered(alert: WishlistAlert | undefined, price: number): boolean {
-  if (!alert || !price) return false;
-  return alert.direction === "above" ? price >= alert.targetPrice : price <= alert.targetPrice;
 }

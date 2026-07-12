@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { pct } from "@/lib/format";
 import { InfoTip } from "@/components/InfoTip";
+import { notifyPriceAlerts } from "@/lib/notifyAlerts";
 
 const money = (v: number, ccy: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy || "USD", maximumFractionDigits: 2 }).format(v ?? 0);
@@ -35,12 +36,32 @@ export function Wishlist({ onSelect, refreshTick = 0 }: { onSelect: (symbol: str
   const [editingSymbol, setEditingSymbol] = useState<string | null>(null);
   const [alertPrice, setAlertPrice] = useState("");
   const [alertDir, setAlertDir] = useState<"above" | "below">("above");
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission | "unsupported">("default");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notifiedRef = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (typeof Notification === "undefined") {
+      setNotifPerm("unsupported");
+      return;
+    }
+    setNotifPerm(Notification.permission);
+  }, []);
+
+  const requestNotifPermission = async () => {
+    if (typeof Notification === "undefined") return;
+    const perm = await Notification.requestPermission();
+    setNotifPerm(perm);
+  };
 
   const load = (force = false) =>
     fetch(`/api/wishlist${force ? "?refresh=1" : ""}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((j) => setItems(j.items ?? []))
+      .then((j) => {
+        const loaded: WishlistItem[] = j.items ?? [];
+        setItems(loaded);
+        notifyPriceAlerts(loaded, notifiedRef);
+      })
       .catch(() => setItems([]));
 
   // refreshTick bumps on "Obnovit ceny" (and every 5 min) — force past the price cache then,
@@ -264,10 +285,27 @@ export function Wishlist({ onSelect, refreshTick = 0 }: { onSelect: (symbol: str
         </ul>
       )}
 
-      <p className="text-muted text-[11px] mt-3">
-        Alert je jen vizuální — položka se zvýrazní, když cena dosáhne cíle (kontroluje se při
-        načtení stránky nebo obnovení cen). Nejde o push notifikaci.
-        <InfoTip text="Appka nemá backend běžící na pozadí, takže neumí poslat notifikaci, když nemáš otevřenou záložku. Dosažení cíle se ověří vždy, když appku otevřeš nebo klikneš na Obnovit ceny." />
+      <div className="mt-3 flex items-center gap-2 flex-wrap">
+        {notifPerm === "default" && (
+          <button
+            onClick={requestNotifPermission}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-line text-muted hover:bg-panel2 transition"
+          >
+            🔔 Povolit notifikace v prohlížeči
+          </button>
+        )}
+        {notifPerm === "granted" && (
+          <span className="text-xs text-muted">🔔 Notifikace povoleny — přijdou i při obnovení na pozadí.</span>
+        )}
+        {notifPerm === "denied" && (
+          <span className="text-xs text-muted">🔕 Notifikace zablokovány v nastavení prohlížeče.</span>
+        )}
+      </div>
+      <p className="text-muted text-[11px] mt-2">
+        Alert se kontroluje při načtení stránky a při automatickém obnovení cen (každých 5 min, jen
+        dokud je tahle záložka otevřená). Když povolíš notifikace, appka při dosažení cíle pošle i
+        systémovou notifikaci Chromu.
+        <InfoTip text="Appka nemá backend běžící na pozadí, takže notifikace nepřijde, když je záložka úplně zavřená. Funguje, dokud běží prohlížeč (i na pozadí/jiné kartě) a appka je otevřená alespoň v jedné záložce." />
       </p>
     </div>
   );
