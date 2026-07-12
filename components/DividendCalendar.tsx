@@ -9,13 +9,13 @@ import { czk } from "@/lib/format";
 const shortDate = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "2-digit" }) : "—";
 
-export function DividendCalendar({ refreshTick = 0 }: { refreshTick?: number }) {
+export function DividendCalendar({ refreshTick = 0, endpoint = "/api/dividends" }: { refreshTick?: number; endpoint?: string }) {
   const [d, setD] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/dividends", { cache: "no-store" })
+    fetch(endpoint, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => !cancelled && setD(j))
       .catch(() => !cancelled && setD({ available: false }))
@@ -24,7 +24,7 @@ export function DividendCalendar({ refreshTick = 0 }: { refreshTick?: number }) 
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshTick]);
+  }, [refreshTick, endpoint]);
 
   if (loading) return <SkeletonBlock height={300} lines={5} />;
   if (!d?.available || !d.payments?.length)

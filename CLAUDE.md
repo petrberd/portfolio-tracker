@@ -162,16 +162,26 @@ Vždy nejdřív ověř dostupnost dat (prostředí blokuje zdroje), teprve pak s
 - **Basic Auth lokálně otravovalo** — proto teď middleware v dev módu vůbec neběží (viz výše).
 - Petr je Head of IT Ops (fintech), appku staví jako osobní nástroj, ne pro širší distribuci (zatím).
 
-## Aktuální stav (2026-07-11)
-- **Nasazeno:** https://xtb-portfolio-tracker.netlify.app (za basic auth). Repo: github.com/petrberd/portfolio-tracker.
-- **Git stav:** `main` je lokálně **8 commitů před `origin/main`** (nepushnuté) — zahrnují: day-change
-  % fix, VIX gauge/graf vylepšení, layout přeskládání (Earnings pod Alokaci, Smart Money odebráno),
-  Revolut import (parser + merge + UI), univerzální Yahoo symbol resolution, README/CLAUDE.md updaty,
-  verzování v1.1.0 → v1.2.1. Čeká se, až uživatel řekne "push".
-- **Poslední pushnutý commit:** `581b083` ("Trigger Netlify deploy (retry)"). Poslední pushnutý tag: `v1.0.0`.
+## Aktuální stav (2026-07-12)
+- **Nasazeno:** https://pb-portfolio-tracker.netlify.app (za basic auth) + veřejné demo bez
+  hesla na `/demo` (viz README a sekci Demo níže). Repo: github.com/petrberd/portfolio-tracker.
+- **Git stav:** `main` je s `origin/main` sesynchronizované (poslední push obsahoval mobilní
+  UX revizi + skeleton loading v1.3.0 a senior UX/UI pass v1.4.0). Tagy `v1.0.0`–`v1.4.0`
+  jsou všechny pushnuté.
 - **Revolut import je live-otestovaný** na reálném vzorku uživatele (6 transakcí: CASH TOP-UP, BUY,
   DIVIDEND) — funguje včetně sloučení s XTB, EUR měny, a nedostupných tickerů (4COP, CEBS = evropské
   ETF, vyřešeno Yahoo search fallbackem).
+- **Veřejné demo** (`/demo`, `app/demo/page.tsx`) — stejný dashboard jako ostrá appka, ale nad
+  syntetickým portfoliem (`lib/demoData.ts`): reálné tickery (Apple, Microsoft, Nvidia, Amazon,
+  Coca-Cola, J&J, Realty Income, Disney), vymyšlené kusy/ceny/historie transakcí. Ceny, dividendy,
+  earnings i novinky jdou přes stejné živé zdroje jako produkce. Vlastní API routy pod
+  `app/api/demo/{portfolio,dividends,earnings,stockdetail}` — zrcadlí produkční routy, jen čtou
+  `buildDemoExport()` místo `loadExport()`. `/api/market` a `/api/analysts` se používají beze
+  změny (jsou obecné, bez vazby na konkrétní portfolio). `middleware.ts` má `PUBLIC_PATHS`
+  (`/demo`, `/api/demo/`, `/api/market`, `/api/analysts`), které obchází Basic Auth i na produkci —
+  zbytek webu (reálná data na `/`) zůstává chráněný beze změny. Sdílené UI komponenty
+  (`Kpi`, `Section`, `HoldingsTable`, …) jsou v `components/PortfolioUI.tsx`, protože Next.js
+  nedovolí extra named exporty přímo z `page.tsx` souboru.
 - **`lib/transfers.ts`:** některé odchody akcií (dar „Send A Gift Transfer Out") jsou jen v Closed
   Positions, ne v Cash Operations. Detekují se tam a odečítají v positions/timeseries/dividend route
   (FIFO, bez realizovaného P/L).

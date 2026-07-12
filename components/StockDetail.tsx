@@ -40,10 +40,12 @@ export function StockDetail({
   ticker,
   instrument,
   onClose,
+  endpoint = "/api/stockdetail",
 }: {
   ticker: string;
   instrument: string;
   onClose: () => void;
+  endpoint?: string;
 }) {
   const [d, setD] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -54,17 +56,29 @@ export function StockDetail({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Lock the background page while the modal is open — otherwise the page behind
+  // this fixed overlay can still scroll (vertically and, on iOS Safari during
+  // momentum scroll, horizontally), which reads as the modal itself "drifting"
+  // instead of staying put.
+  useEffect(() => {
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = overflow;
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/stockdetail?ticker=${encodeURIComponent(ticker)}`, { cache: "no-store" })
+    fetch(`${endpoint}?ticker=${encodeURIComponent(ticker)}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => !cancelled && setD(j))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [ticker]);
+  }, [ticker, endpoint]);
 
   const ccy = d?.currency ?? "USD";
   const f = d?.fundamentals;
@@ -86,9 +100,12 @@ export function StockDetail({
   const netMargin = f && f.revenue > 0 ? (f.netIncome / f.revenue) * 100 : null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 sm:p-8" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center overflow-y-auto overflow-x-hidden p-4 sm:p-8"
+      onClick={onClose}
+    >
       <div
-        className="card w-full max-w-4xl my-4 p-6 relative"
+        className="card w-full max-w-4xl my-4 p-6 relative min-w-0 overflow-x-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <button

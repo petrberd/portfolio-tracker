@@ -4,6 +4,35 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.5.0] — 2026-07-12
+
+### Added
+- **Veřejné demo bez přihlášení** na `/demo` (https://pb-portfolio-tracker.netlify.app/demo) —
+  stejný dashboard jako ostrá appka, ale nad syntetickým portfoliem (`lib/demoData.ts`): reálné,
+  rozpoznatelné tickery (Apple, Microsoft, Nvidia, Amazon, Coca-Cola, Johnson & Johnson,
+  Realty Income, Disney), vymyšlené počty kusů, nákupní ceny a historie transakcí. Ceny,
+  dividendy, earnings i novinky jsou živé — jedou přes stejné zdroje jako produkce
+  (`app/api/demo/{portfolio,dividends,earnings,stockdetail}`). Zbytek webu (reálná data na `/`)
+  zůstává za Basic Authem beze změny — v `middleware.ts` je jen `/demo` a jeho podpůrné API
+  routy (`/api/demo/*`, `/api/market`, `/api/analysts`) výslovně veřejné.
+
+### Fixed
+- **Graf historie VIX měl na ose Y nesmyslná čísla** (např. „97119" místo „13") — chyběl
+  `tickFormatter`, takže se zobrazovaly syrové desetinné hodnoty s plovoucí čárkou
+  (`13.029999732971191`), oříznuté úzkou šířkou osy na nečitelný zbytek. Opraveno zaokrouhlením.
+- **Osa Y u „Hodnota portfolia" a „Výkonnost portfolia"** rezervovala víc místa, než popisky
+  potřebovaly (72px a 64px) — zúženo na 52px/48px s nulovým levým marginem, graf má víc
+  prostoru a čísla sedí blíž k levému okraji karty.
+- **Detail titulu (StockDetail) nebyl na mobilu horizontálně "zafixovaný"** — pozadí za modálem
+  se mohlo posouvat nezávisle, což na iOS Safari při momentum scrollu působilo jako drift celého
+  okna. Modál teď při otevření uzamkne scroll stránky pod sebou (`document.body.style.overflow`)
+  a má `overflow-x-hidden` jako pojistku.
+
+### Changed
+- Sdílené UI komponenty dashboardu (`Kpi`, `Section`, `HoldingsTable`, `TaxTestTable`, …)
+  přesunuty z `app/page.tsx` do `components/PortfolioUI.tsx`, aby je mohla používat i `/demo`
+  stránka — Next.js nedovolí extra named exporty přímo z `page.tsx` souboru.
+
 ## [1.4.0] — 2026-07-11
 
 ### Added

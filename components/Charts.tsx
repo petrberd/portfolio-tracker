@@ -86,7 +86,7 @@ function ValueTooltip({ active, payload, label }: any) {
 export function ValueChart({ data }: { data: { date: string; market: number; costBasis: number }[] }) {
   return (
     <ResponsiveContainer width="100%" height={320}>
-      <ComposedChart data={data} margin={{ top: 10, right: 8, left: 8, bottom: 0 }}>
+      <ComposedChart data={data} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#5b8cff" stopOpacity={0.35} />
@@ -100,7 +100,7 @@ export function ValueChart({ data }: { data: { date: string; market: number; cos
           minTickGap={48}
           tickFormatter={(d) => new Date(d).toLocaleDateString("cs-CZ", { month: "short", year: "2-digit" })}
         />
-        <YAxis tick={axisStyle} width={72} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+        <YAxis tick={axisStyle} width={52} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
         <Tooltip content={<ValueTooltip />} />
         <Legend wrapperStyle={{ fontSize: 12, paddingTop: 6 }} formatter={legendText} />
         <Area type="monotone" dataKey="market" stroke="#5b8cff" strokeWidth={2} fill="url(#valGrad)" name="Tržní hodnota" />
@@ -128,7 +128,7 @@ export function VixChart({ data }: { data: { date: string; vix: number }[] }) {
           minTickGap={48}
           tickFormatter={(d) => new Date(d).toLocaleDateString("cs-CZ", { day: "numeric", month: "short" })}
         />
-        <YAxis tick={axisStyle} width={32} domain={["dataMin - 2", "dataMax + 2"]} />
+        <YAxis tick={axisStyle} width={32} domain={["dataMin - 2", "dataMax + 2"]} tickFormatter={(v) => Math.round(v).toString()} />
         <Tooltip
           contentStyle={tooltipStyle}
           itemStyle={tipItem}
@@ -152,7 +152,7 @@ export function PerformanceChart({ data }: { data: { period: string; gain: numbe
   const crowded = isMobile && data.length > 6;
   return (
     <ResponsiveContainer width="100%" height={crowded ? 320 : 300}>
-      <BarChart data={data} margin={{ top: 10, right: 8, left: 8, bottom: crowded ? 22 : 0 }}>
+      <BarChart data={data} margin={{ top: 10, right: 8, left: 0, bottom: crowded ? 22 : 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#1b2438" vertical={false} />
         <XAxis
           dataKey="period"
@@ -163,7 +163,7 @@ export function PerformanceChart({ data }: { data: { period: string; gain: numbe
           height={crowded ? 40 : 30}
           tickFormatter={periodLabel}
         />
-        <YAxis tick={axisStyle} width={64} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+        <YAxis tick={axisStyle} width={48} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
         <Tooltip
           contentStyle={tooltipStyle}
           itemStyle={tipItem}

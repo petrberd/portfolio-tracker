@@ -6,13 +6,13 @@ import { SkeletonBlock } from "@/components/Skeleton";
 const shortDate = (iso: string) =>
   iso ? new Date(iso).toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "2-digit" }) : "—";
 
-export function EarningsCalendar({ refreshTick = 0 }: { refreshTick?: number }) {
+export function EarningsCalendar({ refreshTick = 0, endpoint = "/api/earnings" }: { refreshTick?: number; endpoint?: string }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/earnings", { cache: "no-store" })
+    fetch(endpoint, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => !cancelled && setData(j))
       .catch(() => !cancelled && setData({ available: false }))
@@ -20,7 +20,7 @@ export function EarningsCalendar({ refreshTick = 0 }: { refreshTick?: number }) 
     return () => {
       cancelled = true;
     };
-  }, [refreshTick]);
+  }, [refreshTick, endpoint]);
 
   if (loading) return <SkeletonBlock height={120} lines={3} />;
   if (!data?.available || !data.events?.length)

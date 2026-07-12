@@ -24,7 +24,17 @@ function timingSafeEqual(a: string, b: string): boolean {
  * local dev server is already only reachable on the developer's own machine,
  * so gating it too just adds friction without a real security benefit.
  */
+// Public even in production: the /demo page (synthetic portfolio, no real account
+// data) and the two API routes it needs that carry no personal data of their own —
+// /api/market (global VIX) and /api/analysts (ticker-keyed analyst consensus).
+const PUBLIC_PATHS = ["/demo", "/api/demo/", "/api/market", "/api/analysts"];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p));
+}
+
 export function middleware(req: NextRequest) {
+  if (isPublicPath(req.nextUrl.pathname)) return NextResponse.next();
   if (process.env.NODE_ENV !== "production") return NextResponse.next();
 
   const user = process.env.BASIC_AUTH_USER;

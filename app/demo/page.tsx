@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { czk, pct, shortDate } from "@/lib/format";
 import {
   AllocationPie,
@@ -31,42 +31,32 @@ import {
 } from "@/components/PortfolioUI";
 
 type Data = any;
-// Every chart's upper end is "today", computed fresh on each request from live data, so
-// new months (deposits, dividends, performance, the income projection) show up on their
-// own as time passes. The lower bounds below are derived from the account's own data
-// (first transaction, first dividend) rather than hardcoded dates, so a different
-// account's history — of any length or start date — needs no manual editing here.
 
-export default function Page() {
+/**
+ * Public, no-login demo of the dashboard: same UI and calculations as the real
+ * app, but fed from a synthetic portfolio (lib/demoData.ts + /api/demo/*) —
+ * real, recognizable tickers so prices/dividends/news are genuinely live, but
+ * every share count and purchase price is made up, not anyone's real account.
+ */
+export default function DemoPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
   const [perfMode, setPerfMode] = useState<"monthly" | "yearly">("monthly");
   const [allocMode, setAllocMode] = useState<"pozice" | "sektory" | "meny">("pozice");
   const [detail, setDetail] = useState<{ ticker: string; instrument: string } | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [justRefreshed, setJustRefreshed] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const revolutFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (force = false) => {
     force ? setRefreshing(true) : setLoading(true);
     setError(null);
     try {
       const qs = force ? "?refresh=1" : "";
-      let res = await fetch(`/api/portfolio${qs}`, { cache: "no-store" });
-      let json = await res.json();
-      // Nothing imported yet -> try auto-import of the export in the folder.
-      if (!json.imported) {
-        await fetch("/api/import", { cache: "no-store" });
-        res = await fetch("/api/portfolio", { cache: "no-store" });
-        json = await res.json();
-      }
+      const res = await fetch(`/api/demo/portfolio${qs}`, { cache: "no-store" });
+      const json = await res.json();
       setData(json);
-      // Brief visible confirmation that "Obnovit ceny" actually did something —
-      // otherwise the button just silently reverts to its idle label.
       if (force) {
         setJustRefreshed(true);
         setTimeout(() => setJustRefreshed(false), 2000);
@@ -83,7 +73,6 @@ export default function Page() {
     load();
   }, [load]);
 
-  // Auto-refresh live data (prices, analyst ratings, dividend calendar…) every 5 minutes.
   useEffect(() => {
     const id = setInterval(() => {
       load(true);
@@ -92,53 +81,13 @@ export default function Page() {
     return () => clearInterval(id);
   }, [load]);
 
-  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>, broker: "xtb" | "revolut" = "xtb") => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    setError(null);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("broker", broker);
-      const res = await fetch("/api/import", { method: "POST", body: form });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Import selhal.");
-      await load();
-    } catch (e: any) {
-      setError(e?.message ?? "Import selhal.");
-    } finally {
-      setImporting(false);
-      e.target.value = "";
-    }
-  };
-
-  if (loading && !data) return <Splash msg="Načítám portfolio a stahuji ceny…" />;
+  if (loading && !data) return <Splash msg="Načítám ukázkové portfolio a stahuji živé ceny…" />;
 
   if (!data?.imported) {
     return (
-      <div className="relative max-w-2xl mx-auto px-6 py-24 text-center overflow-hidden">
-        <svg
-          viewBox="0 0 400 120"
-          className="absolute left-1/2 top-8 -translate-x-1/2 w-[420px] max-w-none opacity-[0.07] pointer-events-none"
-          aria-hidden
-        >
-          <path
-            d="M0 100 L40 92 L80 96 L120 70 L160 78 L200 45 L240 55 L280 20 L320 32 L360 8 L400 15"
-            fill="none"
-            stroke="#5b8cff"
-            strokeWidth={3}
-          />
-        </svg>
-        <div className="relative">
-          <h1 className="text-2xl font-semibold mb-2">Portfolio Tracker</h1>
-          <p className="text-muted mb-8">Zatím nemáš naimportovaná data z XTB ani Revolutu.</p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <UploadButton fileRef={fileRef} onUpload={onUpload} importing={importing} broker="xtb" big />
-            <UploadButton fileRef={revolutFileRef} onUpload={onUpload} importing={importing} broker="revolut" big />
-          </div>
-          {error && <p className="text-neg mt-4 text-sm">{error}</p>}
-        </div>
+      <div className="max-w-2xl mx-auto px-6 py-24 text-center">
+        <h1 className="text-2xl font-semibold mb-2">Portfolio Tracker — demo</h1>
+        <p className="text-muted">{error ?? "Demo se nepodařilo načíst, zkus obnovit stránku."}</p>
       </div>
     );
   }
@@ -146,14 +95,11 @@ export default function Page() {
   const s = data.summary;
   const holdings = data.holdings as any[];
 
-  // First full calendar month of activity — the first (often partial, mid-month) month
-  // is skipped so the value/performance charts start on a clean, meaningful baseline.
   const firstOpMonth = (s.firstOpDate as string)?.slice(0, 7) || "";
   const secondFullMonth = firstOpMonth ? addMonths(firstOpMonth, 1) : "";
   const VALUE_FROM = secondFullMonth ? `${secondFullMonth}-01` : "";
   const DEPOSITS_FROM = secondFullMonth;
   const PERFORMANCE_FROM = secondFullMonth;
-  // First month with an actual dividend, so the chart never opens with a run of blank months.
   const DIVIDENDS_FROM = (s.dividendByMonth as any[])?.[0]?.month ?? firstOpMonth;
 
   const series = (data.series as any[]).filter((p) => p.date >= VALUE_FROM);
@@ -178,8 +124,6 @@ export default function Page() {
       : allocMode === "meny"
       ? groupSum((h) => h.currency)
       : holdings.filter((h) => h.marketValueCzk > 0).map((h) => ({ name: h.instrument, value: h.marketValueCzk }));
-  // Past ~8 slices a pie/legend stops being readable — fold anything under 3% of the total
-  // into a single "Ostatní" bucket so the chart and legend stay scannable at a glance.
   const alloc = (() => {
     if (allocRaw.length <= 8) return allocRaw;
     const total = allocRaw.reduce((sum, a) => sum + a.value, 0);
@@ -199,36 +143,50 @@ export default function Page() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {/* Demo banner */}
+      <div className="card p-4 mb-6 flex flex-wrap items-center justify-between gap-3 border-brand/40 bg-brand/5">
+        <p className="text-sm">
+          <span className="font-semibold text-brand">Demo</span>{" "}
+          <span className="text-muted">
+            — ukázkové portfolio. Ceny, dividendy a novinky jsou živé (skutečné tickery), ale kusy, nákupní ceny a
+            historie transakcí jsou vymyšlené.
+          </span>
+        </p>
+        <a
+          href="https://github.com/petrberd/portfolio-tracker"
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm px-3 py-2 rounded-xl border border-line hover:bg-panel2 transition shrink-0"
+        >
+          ↗ Zdrojový kód na GitHubu
+        </a>
+      </div>
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-semibold">Portfolio Tracker</h1>
           <p className="text-muted text-sm mt-1">
-            Účet {data.accountNumber} · {holdings.length} otevřených pozic · ceny z{" "}
-            {data.importedAt ? shortDate(data.importedAt) : "—"}
+            Ukázkové portfolio · {holdings.length} otevřených pozic · ceny z {shortDate(data.importedAt)}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center">
-            <button
-              onClick={() => load(true)}
-              disabled={refreshing}
-              className={`text-sm px-3 py-2 rounded-xl border transition disabled:opacity-50 ${
-                justRefreshed ? "border-pos/40 text-pos" : "border-line hover:bg-panel2"
-              }`}
-            >
-              {refreshing ? "Stahuji…" : justRefreshed ? "✓ Aktualizováno" : "↻ Obnovit ceny"}
-            </button>
-            <InfoTip text="Ihned stáhne aktuální ceny akcií, kurz a rating analytiků (jinak se stránka sama obnovuje každých 5 minut)." />
-          </div>
-          <UploadButton fileRef={fileRef} onUpload={onUpload} importing={importing} broker="xtb" label="↑ XTB" />
-          <UploadButton fileRef={revolutFileRef} onUpload={onUpload} importing={importing} broker="revolut" label="↑ Revolut" />
+        <div className="flex items-center">
+          <button
+            onClick={() => load(true)}
+            disabled={refreshing}
+            className={`text-sm px-3 py-2 rounded-xl border transition disabled:opacity-50 ${
+              justRefreshed ? "border-pos/40 text-pos" : "border-line hover:bg-panel2"
+            }`}
+          >
+            {refreshing ? "Stahuji…" : justRefreshed ? "✓ Aktualizováno" : "↻ Obnovit ceny"}
+          </button>
+          <InfoTip text="Ihned stáhne aktuální ceny akcií, kurz a rating analytiků (jinak se stránka sama obnovuje každých 5 minut)." />
         </div>
       </div>
 
       {error && <p className="text-neg mb-4 text-sm">{error}</p>}
 
-      {/* Headline — the one number to check at a glance, before the KPI grid below explains it. */}
+      {/* Headline */}
       {risk && (
         <div className="card p-5 mb-6 flex flex-wrap items-center gap-x-8 gap-y-3">
           <div>
@@ -250,20 +208,12 @@ export default function Page() {
       )}
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        {(s.cashAccounts ?? []).length > 0 && (
-          <Kpi
-            label="Volná hotovost"
-            value={czk(s.freeCash ?? 0)}
-            sub={(s.cashAccounts ?? []).map((a: any) => a.name).join(" + ") || undefined}
-            hint="Hotovost na spořicích účtech mimo brokerské účty. Nastavuje se v data/cash.json."
-          />
-        )}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Kpi
           label="Tržní hodnota"
           value={czk(s.totalMarketValue + (s.xtbCash ?? 0))}
           sub={`vč. volných ${czk(s.xtbCash ?? 0)}`}
-          hint="Celková hodnota brokerských účtů (XTB + Revolut): tržní hodnota držených akcií (kusy × živá cena × kurz) + volné nezainvestované prostředky."
+          hint="Celková hodnota účtu: tržní hodnota držených akcií (kusy × živá cena × kurz) + volné nezainvestované prostředky."
         />
         <Kpi
           label="Nerealizovaný zisk"
@@ -293,11 +243,7 @@ export default function Page() {
         subtitle="Tržní hodnota vs. pořizovací cena držených pozic (CZK)"
         hint="Modrá = tržní hodnota akcií, oranžová = jejich pořizovací cena (FIFO). Svislý rozdíl = nerealizovaný zisk. Ceny přepočteny dnešním kurzem."
       >
-        {series?.length ? (
-          <ValueChart data={series} />
-        ) : (
-          <Empty msg="Historická data se nepodařilo načíst. Zkus Obnovit ceny." />
-        )}
+        {series?.length ? <ValueChart data={series} /> : <Empty msg="Historická data se nepodařilo načíst." />}
       </Section>
 
       {/* Performance per period */}
@@ -305,7 +251,7 @@ export default function Page() {
         <Section
           title="Výkonnost portfolia"
           subtitle="Sloupce = zisk/ztráta v Kč · výnos počítán jako TWR (nezávislý na vkladech)"
-          hint="Zisk/ztráta za období očištěná o vklady a výběry. Výnos v tooltipu je TWR (time-weighted) — čistá výkonnost titulů nezávislá na tom, kdy a kolik jsi vložila."
+          hint="Zisk/ztráta za období očištěná o vklady a výběry. Výnos v tooltipu je TWR (time-weighted) — čistá výkonnost titulů nezávislá na tom, kdy a kolik bylo vloženo."
           action={
             <Toggle
               value={perfMode}
@@ -325,8 +271,8 @@ export default function Page() {
       <div className="mt-6">
         <Section
           title="Výkonnost vs. trh"
-          subtitle="Tvé portfolio (TWR) vs. S&P 500 Total Return, přepočteno na 100 k počátku"
-          hint="Obě křivky startují na 100. S&P 500 je počítáno jako Total Return index (^SP500TR, vč. reinvestovaných dividend) — fér srovnání proti tvému portfoliu, které dividendy a úroky taky zahrnuje do výkonnosti."
+          subtitle="Portfolio (TWR) vs. S&P 500 Total Return, přepočteno na 100 k počátku"
+          hint="Obě křivky startují na 100. S&P 500 je počítáno jako Total Return index (^SP500TR, vč. reinvestovaných dividend)."
         >
           {risk && (
             <div className="grid grid-cols-2 gap-3 mb-4">
@@ -352,7 +298,7 @@ export default function Page() {
         <Section
           title="Nálada trhu"
           subtitle="VIX — index očekávané volatility S&P 500 („index strachu“)"
-          hint="VIX měří implikovanou volatilitu opcí na S&P 500 na příštích 30 dní — čím vyšší, tím víc trh čeká výkyvy (strach); nízký VIX = klid. Pásma jsou obecně používaný odhad, ne oficiální klasifikace CBOE."
+          hint="VIX měří implikovanou volatilitu opcí na S&P 500 na příštích 30 dní."
           secondary
         >
           <MarketMood refreshTick={refreshTick} />
@@ -365,7 +311,7 @@ export default function Page() {
           <Section
             title="Alokace portfolia"
             subtitle="Podle tržní hodnoty"
-            hint="Rozdělení tržní hodnoty pozic. Přepínej mezi jednotlivými tituly, sektory (data z Finnhubu) a měnami."
+            hint="Rozdělení tržní hodnoty pozic. Přepínej mezi jednotlivými tituly, sektory a měnami."
             action={
               <Toggle
                 value={allocMode}
@@ -380,13 +326,13 @@ export default function Page() {
           >
             {alloc.length ? <AllocationPie data={alloc} /> : <Empty msg="Žádné otevřené pozice." />}
           </Section>
-          <Section title="Pozice" subtitle="Klikni na titul pro detail, graf s tvými obchody a novinky">
+          <Section title="Pozice" subtitle="Klikni na titul pro detail, graf s obchody a novinky">
             <HoldingsTable holdings={holdings} total={s.totalMarketValue} onSelect={setDetail} />
           </Section>
         </div>
         <div className="lg:col-span-2 min-w-0 h-full">
           <Section title="Earnings kalendář" subtitle="Nejbližší termín výsledků" className="h-full flex flex-col" secondary>
-            <EarningsCalendar refreshTick={refreshTick} />
+            <EarningsCalendar refreshTick={refreshTick} endpoint="/api/demo/earnings" />
           </Section>
         </div>
       </div>
@@ -409,7 +355,7 @@ export default function Page() {
             <MiniStat
               label="Yield on cost"
               value={`${(s.dividendYieldOnCostPct ?? 0).toFixed(2)} %`}
-              hint="Roční dividendy / pořizovací cena. Výnos vůči tomu, cos za akcie zaplatila."
+              hint="Roční dividendy / pořizovací cena."
             />
             <MiniStat
               label="Dividendový výnos"
@@ -429,7 +375,7 @@ export default function Page() {
               <MiniStat
                 label="Průměrný vklad / měsíc"
                 value={czk(avgMonthlyDeposit)}
-                hint={`Součet vkladů od ${monthYear(DEPOSITS_FROM)} vydělený počtem měsíců v tomto období (vč. měsíců bez vkladu).`}
+                hint={`Součet vkladů od ${monthYear(DEPOSITS_FROM)} vydělený počtem měsíců v tomto období.`}
               />
             </div>
           )}
@@ -439,8 +385,8 @@ export default function Page() {
 
       {/* Dividend projection / calendar */}
       <div className="mt-6">
-        <Section title="Projekce příjmů" subtitle="Očekávaný příjem na 12 měsíců: dividendy (podle akcií k ex-dni) + úroky ze spořicích účtů (netto po 15% dani)">
-          <DividendCalendar refreshTick={refreshTick} />
+        <Section title="Projekce příjmů" subtitle="Očekávaný příjem na 12 měsíců podle akcií k ex-dni">
+          <DividendCalendar refreshTick={refreshTick} endpoint="/api/demo/dividends" />
         </Section>
       </div>
 
@@ -449,7 +395,7 @@ export default function Page() {
         <Section
           title="Daňový přehled"
           subtitle="Osvobození od daně z příjmu při prodeji akcií (§4/1/w ZDP)"
-          hint="Orientační výpočet, ne daňové poradenství. Prodej je osvobozen, pokud je splněna ALESPOŇ JEDNA podmínka: časový test (držba přes 3 roky od nákupu, po jednotlivých FIFO tranších) nebo roční hodnotový limit (celkový hrubý příjem z prodeje CP v kalendářním roce do 100 000 Kč, bez ohledu na dobu držby)."
+          hint="Orientační výpočet, ne daňové poradenství."
           secondary
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -457,12 +403,12 @@ export default function Page() {
               label="Využito ročního limitu"
               value={`${czk(s.taxYearSoldCzk ?? 0)} / ${czk(ANNUAL_VALUE_LIMIT_CZK)}`}
               tone={(s.taxYearSoldCzk ?? 0) > ANNUAL_VALUE_LIMIT_CZK ? "neg" : undefined}
-              hint="Hrubý příjem (ne zisk) z prodeje akcií v aktuálním kalendářním roce. Pod 100 000 Kč je zisk osvobozený bez ohledu na dobu držby."
+              hint="Hrubý příjem (ne zisk) z prodeje akcií v aktuálním kalendářním roce."
             />
             <MiniStat
               label="Zbývá do limitu"
               value={czk(Math.max(0, ANNUAL_VALUE_LIMIT_CZK - (s.taxYearSoldCzk ?? 0)))}
-              hint="Kolik ještě letos můžeš prodat (hrubý příjem), aby zisk zůstal osvobozený i bez splnění časového testu."
+              hint="Kolik ještě letos lze prodat (hrubý příjem), aby zisk zůstal osvobozený i bez splnění časového testu."
             />
           </div>
           <TaxTestTable holdings={holdings} />
@@ -470,32 +416,17 @@ export default function Page() {
       </div>
 
       <p className="text-center text-muted text-xs mt-10">
-        Ceny: Yahoo Finance · Výpočet pozic: FIFO z XTB/Revolut transakcí · Pouze pro osobní přehled, ne investiční poradenství.
+        Demo · Ceny: Yahoo Finance · Výpočet pozic: FIFO ze syntetických transakcí · Data jsou vymyšlená, ne investiční doporučení.
       </p>
 
-      {detail && <StockDetail ticker={detail.ticker} instrument={detail.instrument} onClose={() => setDetail(null)} />}
+      {detail && (
+        <StockDetail
+          ticker={detail.ticker}
+          instrument={detail.instrument}
+          onClose={() => setDetail(null)}
+          endpoint="/api/demo/stockdetail"
+        />
+      )}
     </div>
-  );
-}
-
-function UploadButton({ fileRef, onUpload, importing, big, broker = "xtb", label }: any) {
-  const accept = broker === "revolut" ? ".csv" : ".xlsx,.xls";
-  const defaultLabel = broker === "revolut" ? "Nahrát Revolut export (.csv)" : "Nahrát XTB export (.xlsx)";
-  return (
-    <label
-      className={`inline-flex items-center gap-2 rounded-xl transition cursor-pointer ${
-        broker === "revolut" ? "border border-line hover:bg-panel2" : "bg-brand text-white hover:opacity-90"
-      } ${big ? "px-5 py-3 text-base" : "px-3 py-2 text-sm"}`}
-    >
-      {importing ? "Importuji…" : label ?? (big ? defaultLabel : "↑ Nahrát export")}
-      <input
-        ref={fileRef}
-        type="file"
-        accept={accept}
-        className="hidden"
-        onChange={(e) => onUpload(e, broker)}
-        disabled={importing}
-      />
-    </label>
   );
 }
