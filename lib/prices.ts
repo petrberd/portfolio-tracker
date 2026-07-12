@@ -124,6 +124,40 @@ async function resolveSymbol(raw: string): Promise<string> {
   return raw; // give up — caller's own fetch will fail the same way it would have without this
 }
 
+export interface SymbolSuggestion {
+  symbol: string;
+  name: string;
+  exchange: string;
+}
+
+/**
+ * User-facing ticker/company-name search (for the wishlist "add a stock" box) —
+ * same Yahoo search endpoint as resolveSymbol's fallback, but returns several
+ * candidates with display names instead of silently picking the first hit.
+ */
+export async function searchSymbols(query: string): Promise<SymbolSuggestion[]> {
+  const q = query.trim();
+  if (!q) return [];
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=8&newsCount=0`,
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+    if (!res.ok) return [];
+    const json: any = await res.json();
+    return (json?.quotes ?? [])
+      .filter((r: any) => r.symbol && (r.quoteType === "EQUITY" || r.quoteType === "ETF"))
+      .map((r: any) => ({
+        symbol: r.symbol as string,
+        name: (r.longname || r.shortname || r.symbol) as string,
+        exchange: (r.exchDisp || r.exchange || "") as string,
+      }));
+  } catch (e) {
+    console.error(`searchSymbols failed for "${q}"`, e);
+    return [];
+  }
+}
+
 async function fetchChartRaw(symbol: string): Promise<Chart | null> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
     symbol

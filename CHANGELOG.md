@@ -4,6 +4,27 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.7.0] — 2026-07-12
+
+### Added
+- **Sledované tituly (wishlist)** — nová sekce pro tituly mimo portfolio. Přidání podle
+  tickeru nebo názvu firmy (autocomplete přes Yahoo search), živá cena a denní změna, cíl
+  analytiků (12měsíční průměr) a potenciál v % přímo v přehledu, klik na titul otevře stejný
+  detail jako u vlastní pozice (jen bez tvých obchodů). Volitelný cenový alert (nad/pod cílovou
+  cenou) — čistě vizuální zvýraznění při dosažení, appka nemá backend na pozadí pro push
+  notifikace. `lib/wishlist.ts`, `app/api/wishlist/*`.
+- **Skrývání sekcí** — každá sekce dashboardu jde dočasně skrýt (malé „−" tlačítko v hlavičce
+  s tooltipem) a zase vrátit přes chip „Skryté sekce" v horní liště. Perzistováno na serveru,
+  takže se nastavení drží napříč zařízeními. `lib/sectionVisibility.ts`, `app/api/section-visibility`.
+- **Přesouvání sekcí (drag & drop)** — sekce jdou přetáhnout za úchyt „⠿" a přeuspořádat podle
+  potřeby; pořadí se ukládá stejně jako viditelnost (napříč zařízeními). Použito `dnd-kit`
+  (myš, dotyk i klávesnice). Alokace+Pozice+Earnings a Dividendy+Vklady se přesouvají jako
+  jeden blok, aby zůstalo zachované side-by-side rozložení na desktopu. `lib/sectionOrder.ts`,
+  `app/api/section-order`.
+- **Srozumitelnější „bez pokrytí" stavy** — když titul nemá analytické odhady (např. DJT),
+  appka to teď jasně řekne na všech třech místech (hlavní panel, detail titulu, wishlist)
+  místo tichého prázdna nebo obecné hlášky.
+
 ## [1.6.0] — 2026-07-12
 
 ### Changed

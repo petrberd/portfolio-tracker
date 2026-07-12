@@ -41,11 +41,14 @@ export function StockDetail({
   instrument,
   onClose,
   endpoint = "/api/stockdetail",
+  resolved = false,
 }: {
   ticker: string;
   instrument: string;
   onClose: () => void;
   endpoint?: string;
+  /** True when `ticker` is already a Yahoo symbol (e.g. a wishlist item), not an XTB ticker to convert. */
+  resolved?: boolean;
 }) {
   const [d, setD] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -71,14 +74,15 @@ export function StockDetail({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`${endpoint}?ticker=${encodeURIComponent(ticker)}`, { cache: "no-store" })
+    const qs = `ticker=${encodeURIComponent(ticker)}${resolved ? "&resolved=1" : ""}`;
+    fetch(`${endpoint}?${qs}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => !cancelled && setD(j))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [ticker, endpoint]);
+  }, [ticker, endpoint, resolved]);
 
   const ccy = d?.currency ?? "USD";
   const f = d?.fundamentals;
@@ -205,7 +209,7 @@ export function StockDetail({
             </div>
 
             {/* Analyst summary */}
-            {a && (
+            {a ? (
               <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm border-t border-line pt-4">
                 <span className="stat-label">Analytici:</span>
                 {rating && (
@@ -218,6 +222,11 @@ export function StockDetail({
                   {upside != null && <span className={upside >= 0 ? "text-pos" : "text-neg"}> ({upside >= 0 ? "+" : ""}{upside.toFixed(1)} %)</span>}
                   {" "}· {a.count} analytiků
                 </span>
+              </div>
+            ) : (
+              <div className="mt-5 text-sm text-muted border-t border-line pt-4">
+                <span className="stat-label">Analytici:</span> bez pokrytí — titul nemá dostupné
+                analytické odhady (běžné u menších/spekulativních firem nebo mimo US trh).
               </div>
             )}
 

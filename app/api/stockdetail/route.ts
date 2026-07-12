@@ -10,13 +10,20 @@ import { fetchDividendMeta } from "@/lib/divcalendar";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Everything the stock detail view needs, in one call. Keyed by XTB ticker. */
+/**
+ * Everything the stock detail view needs, in one call. Keyed by XTB ticker —
+ * except wishlist items, which aren't real holdings and so have no XTB ticker
+ * to convert; `resolved=1` says `ticker` is already a Yahoo symbol, skip
+ * `yahooSymbol()`. Either way, "your trades" only matches real XTB tickers in
+ * the import, so a wishlist symbol simply shows no trades (as intended).
+ */
 export async function GET(req: NextRequest) {
   const ticker = req.nextUrl.searchParams.get("ticker")?.trim();
+  const resolved = req.nextUrl.searchParams.get("resolved") === "1";
   if (!ticker) {
     return NextResponse.json({ error: "Chybí parametr ticker." }, { status: 400 });
   }
-  const symbol = yahooSymbol(ticker);
+  const symbol = resolved ? ticker : yahooSymbol(ticker);
 
   const [chart, dailyHistory, stored, fundamentals, analysts, news, insider, dividend] = await Promise.all([
     fetchChart(symbol),

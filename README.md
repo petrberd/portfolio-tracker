@@ -1,6 +1,6 @@
 # Portfolio Tracker
 
-[![Version](https://img.shields.io/badge/version-1.6.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.7.0-blue)](CHANGELOG.md)
 
 Lokální webová aplikace na sledování investičního portfolia z **XTB a/nebo Revolutu** —
 po vzoru Alocano / Stonkee. Naimportuje export z brokera(ů), zrekonstruuje aktuální pozice
@@ -129,6 +129,11 @@ reálné riziko je zanedbatelné.
   kusů je už přes 3 roky osvobozeno a kdy se osvobodí další tranše; plus roční hodnotový
   limit 100 000 Kč (hrubý příjem z prodeje CP za kalendářní rok). Orientační výpočet, ne
   daňové poradenství.
+- **Sledované tituly (wishlist)** — přidej libovolný titul mimo portfolio podle tickeru
+  nebo názvu firmy (autocomplete přes Yahoo search). U ceny rovnou vidíš i cíl analytiků
+  a potenciál v %; klik otevře stejný detail jako u vlastní pozice (bez tvých obchodů).
+  Volitelný cenový alert (nad/pod cílovou cenou) — čistě vizuální zvýraznění při dosažení,
+  kontroluje se při načtení stránky/obnovení cen, appka nemá backend na push notifikace.
 
 Sektor i insider obchody jedou přes bezplatné zdroje bez API klíče (stockanalysis.com, Nasdaq).
 Institucionální držba a cílové ceny nad rámec analytického konsenzu se nedělají — appka nemá
@@ -142,6 +147,16 @@ placený zdroj na ně.
 Tlačítko **Obnovit ceny** obchází cache a stáhne aktuální ceny; appka se navíc sama obnovuje
 každých 5 minut. Denní změna se počítá z živé ceny (`regularMarketPrice`) proti poslednímu
 uzavřenému dennímu close.
+
+### Přizpůsobení dashboardu
+- **Skrývání sekcí** — malé „−" tlačítko v hlavičce každé sekce ji dočasně skryje; zpátky
+  ji zapneš přes chip „Skryté sekce" v horní liště.
+- **Přesouvání sekcí** — úchyt „⠿" v hlavičce jde přetáhnout myší, dotykem i klávesnicí
+  (šipky + mezerník) a přeuspořádat sekce podle potřeby. Alokace+Pozice+Earnings a
+  Dividendy+Vklady se přesouvají jako jeden blok, aby zůstalo zachované side-by-side
+  rozložení na desktopu.
+
+Obojí se ukládá na serveru (ne jen v prohlížeči), takže si nastavení držíš napříč zařízeními.
 
 ## Jak to počítá
 
@@ -186,9 +201,12 @@ Lokálně v `data/` (gitignored), na Netlify přes Netlify Blobs (`lib/storage.t
   `divcal.json`, `earnings.json` — cache jednotlivých datových zdrojů (smaž pro vynucené
   stažení; TTL se liší modul od modulu, viz komentáře v `lib/`).
 - `cash.json` — externí spořicí účty (volitelné, `.env.example`/README výše).
+- `wishlist.json` — sledované tituly mimo portfolio + jejich alerty.
+- `sectionVisibility.json`, `sectionOrder.json` — které sekce dashboardu jsou skryté a
+  v jakém pořadí se zobrazují (viz „Přizpůsobení dashboardu" výše).
 
 Vše zůstává lokálně, nic se nikam neposílá. Jen pro osobní přehled — není to investiční poradenství.
 
 ## Technologie
 
-Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind CSS.
+Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind CSS · dnd-kit.

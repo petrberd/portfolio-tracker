@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { InfoTip } from "@/components/InfoTip";
+import { IconButton } from "@/components/IconButton";
 import { SemiGauge } from "@/components/Gauge";
 import { SkeletonBlock } from "@/components/Skeleton";
 
@@ -68,7 +69,16 @@ interface Breakdown {
   strongSell: number;
 }
 
-export function AnalystPanel({ holdings, refreshTick = 0 }: { holdings: Holding[]; refreshTick?: number }) {
+export function AnalystPanel({
+  holdings,
+  refreshTick = 0,
+  onHide,
+}: {
+  holdings: Holding[];
+  refreshTick?: number;
+  /** Shows a small "hide this section" control in the header when provided. */
+  onHide?: () => void;
+}) {
   const [symbol, setSymbol] = useState(holdings[0]?.symbol ?? "");
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -114,18 +124,31 @@ export function AnalystPanel({ holdings, refreshTick = 0 }: { holdings: Holding[
             ))}
           </select>
         </div>
-        {rating && (
-          <span className="text-sm font-semibold px-2.5 py-1 rounded-lg shrink-0" style={{ color: rating.color, background: `${rating.color}1f` }}>
-            {rating.label}
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {rating && (
+            <span className="text-sm font-semibold px-2.5 py-1 rounded-lg" style={{ color: rating.color, background: `${rating.color}1f` }}>
+              {rating.label}
+            </span>
+          )}
+          {onHide && (
+            <IconButton
+              onClick={onHide}
+              label="Skrýt sekci Analytické odhady"
+              tooltip="Dočasně skryje tuto sekci. Zpátky ji zapneš přes „Skryté sekce“ nahoře na stránce."
+            >
+              −
+            </IconButton>
+          )}
+        </div>
       </div>
 
       {loading && <SkeletonBlock height={240} lines={5} />}
 
       {!loading && data && !data.available && (
         <div className="h-[240px] flex items-center justify-center text-muted text-sm text-center px-6">
-          Pro tento titul nejsou dostupné analytické odhady (většinou jen US akcie).
+          Pro tento titul nejsou dostupné analytické odhady — buď titul nemá analytické pokrytí (běžné
+          u menších nebo spekulativních firem, např. DJT), nebo jde o zahraniční trh mimo US, kde tenhle
+          zdroj data nemá.
         </div>
       )}
 

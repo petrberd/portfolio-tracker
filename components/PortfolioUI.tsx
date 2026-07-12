@@ -8,6 +8,7 @@
 import { czk, num, pct, shortDate } from "@/lib/format";
 import { PALETTE } from "@/components/Charts";
 import { InfoTip } from "@/components/InfoTip";
+import { IconButton } from "@/components/IconButton";
 import { holdingTaxStatus } from "@/lib/taxtest";
 
 /** "YYYY-MM" shifted by `n` months (n can be negative). */
@@ -59,6 +60,7 @@ export function Section({
   className,
   children,
   secondary,
+  onHide,
 }: {
   title: string;
   subtitle?: string;
@@ -69,6 +71,8 @@ export function Section({
   /** Lower-priority sections (VIX, earnings, tax) read visually quieter, so primary
    * sections (value, performance, allocation, holdings) keep first claim on attention. */
   secondary?: boolean;
+  /** Shows a small "hide this section" control in the header when provided. */
+  onHide?: () => void;
 }) {
   return (
     <div className={`card p-5 min-w-0 ${secondary ? "card-secondary" : ""} ${className ?? ""}`}>
@@ -80,7 +84,18 @@ export function Section({
           </h2>
           {subtitle && <p className="text-muted text-xs mt-0.5">{subtitle}</p>}
         </div>
-        {action}
+        <div className="flex items-center gap-2 shrink-0">
+          {action}
+          {onHide && (
+            <IconButton
+              onClick={onHide}
+              label={`Skrýt sekci ${title}`}
+              tooltip="Dočasně skryje tuto sekci. Zpátky ji zapneš přes „Skryté sekce“ nahoře na stránce."
+            >
+              −
+            </IconButton>
+          )}
+        </div>
       </div>
       {children}
     </div>
