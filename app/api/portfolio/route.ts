@@ -3,7 +3,7 @@ import { loadExport } from "@/lib/store";
 import { reconstructPortfolio, type Holding } from "@/lib/positions";
 import { fetchQuote, fetchFxCzk } from "@/lib/prices";
 import { buildValueSeries, computePerformance, computeRiskMetrics, buildBenchmark } from "@/lib/timeseries";
-import { fetchProfile } from "@/lib/finnhub";
+import { fetchSector } from "@/lib/sector";
 import { loadCash, freeCashTotal } from "@/lib/cash";
 
 export const runtime = "nodejs";
@@ -56,8 +56,8 @@ export async function GET(req: NextRequest) {
   const fx = new Map<string, number>();
   await Promise.all(currencies.map(async (c) => fx.set(c, await fetchFxCzk(c, force))));
 
-  // Sector per holding (Finnhub, cached) + trailing-12m dividends (from export).
-  const profiles = await Promise.all(summary.holdings.map((h) => fetchProfile(h.symbol)));
+  // Sector per holding (stockanalysis.com, cached, no API key needed) + trailing-12m dividends (from export).
+  const sectors = await Promise.all(summary.holdings.map((h) => fetchSector(h.symbol)));
   const divTtm = trailingDividends(stored);
 
   const holdings: EnrichedHolding[] = summary.holdings.map((h, i) => {
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
       marketValueCzk,
       unrealizedPnlCzk,
       unrealizedPnlPct: h.czkCostBasis > 0 ? (unrealizedPnlCzk / h.czkCostBasis) * 100 : 0,
-      sector: profiles[i]?.sector ?? "Ostatní",
+      sector: sectors[i] ?? "Ostatní",
       dividendTtmCzk,
       yieldOnCostPct: h.czkCostBasis > 0 ? (dividendTtmCzk / h.czkCostBasis) * 100 : 0,
     };

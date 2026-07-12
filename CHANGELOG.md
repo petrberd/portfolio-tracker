@@ -4,6 +4,21 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.6.0] — 2026-07-12
+
+### Changed
+- **Appka už nepotřebuje žádný API klíč.** Sektor přesunut z Finnhubu na stockanalysis.com
+  (`lib/sector.ts`, `infoTable` pole ze stejného `__data.json`, který už appka používala pro
+  analytiky/earnings). Insider obchody přesunuty z Finnhubu na Nasdaq
+  (`lib/nasdaqInsider.ts`, `api.nasdaq.com/api/company/<sym>/insider-trades`) — na rozdíl od
+  Nasdaq dividendového endpointu funguje i pro NYSE tickery (ověřeno na VICI, JNJ, Realty
+  Income). Nasdaq vrací typ transakce jako text, ne signed kód — nákup/prodej se odvozuje
+  z `BUY_TYPES`/`SELL_TYPES` množin, nejednoznačné typy (např. „Option Execute") se zahazují.
+
+### Removed
+- `lib/finnhub.ts` a `FINNHUB_API_KEY` (z `.env.example` i dokumentace) — appka žádný Finnhub
+  volání už nedělá.
+
 ## [1.5.0] — 2026-07-12
 
 ### Added

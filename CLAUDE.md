@@ -9,7 +9,7 @@ sloučí do jednoho portfolia. Vše běží lokálně, data zůstávají u uživ
 ## Spuštění
 ```bash
 npm install
-cp .env.example .env.local   # volitelně doplnit FINNHUB_API_KEY
+cp .env.example .env.local   # volitelně BASIC_AUTH_* — appka nepotřebuje žádný API klíč
 npm run dev                  # http://localhost:3210
 ```
 Při prvním otevření (bez dat) appka ukáže obrazovku pro nahrání exportu — **XTB** (.xlsx)
@@ -53,7 +53,14 @@ Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind.
 - `lib/earnings.ts` — nejbližší termín výsledků ze stockanalysis.com (stejný `__data.json` pattern
   jako analysts.ts). Když je poslední známé datum v minulosti, promítne se o ~91 dní dopředu
   a označí „(odhad)".
-- `lib/finnhub.ts` — sektor (`profile2`) + insider obchody (`insider-transactions`). Vyžaduje klíč.
+- `lib/sector.ts` — sektor/industry ze stockanalysis.com (`__data.json`, stejný "devalue" parser
+  jako analysts.ts/earnings.ts, `infoTable` pole). Bez API klíče.
+- `lib/nasdaqInsider.ts` — insider obchody z Nasdaq `api.nasdaq.com/api/company/<sym>/insider-trades`
+  (stejná doména jako `fromNasdaq()` v `divcalendar.ts`, ale na rozdíl od dividend endpointu
+  funguje i pro NYSE tickery — ověřeno na VICI/JNJ). Bez API klíče. `transactionType` je textový
+  popisek, ne signed kód — buy/sell se odvozuje z `BUY_TYPES`/`SELL_TYPES` množin, nejednoznačné
+  typy (např. „Option Execute") se zahodí. Nahradil dřívější `lib/finnhub.ts` (smazán) — appka
+  teď nepotřebuje žádný API klíč pro insider obchody ani sektor.
 - `lib/news.ts` — novinky z Yahoo RSS.
 - `lib/divcalendar.ts` — dividendový kalendář (frekvence, částka, ex/pay date) + projekce plateb na
   12 měsíců (okno od PŘÍŠTÍHO měsíce, ne aktuálního — current month bývá částečně pryč). Fallback
@@ -73,13 +80,19 @@ Zjištěno empiricky (prostředí blokuje část zdrojů):
   jako univerzální fallback při dohledání Yahoo symbolu (viz `lib/prices.ts`).
 - ✅ **Yahoo `fundamentals-timeseries`** — roční fundamenty, bez crumbu.
 - ✅ **stockanalysis.com** `/stocks/<ticker>/__data.json` — analytici, earnings date, dividend historie
-  (ex+pay date, i NYSE). US-centrické, u evropských tickerů většinou nedostupné.
+  (ex+pay date, i NYSE), a sektor/industry (`infoTable` pole, viz `lib/sector.ts`) — bez klíče.
+  US-centrické, u evropských tickerů většinou nedostupné.
 - ✅ **Nasdaq** `api.nasdaq.com/api/quote/<sym>/dividends?assetclass=stocks` — reálné ex+pay date, ale jen
   **Nasdaq-listed** (NYSE jako VICI/MO vrací prázdno → fallback stockanalysis.com/Yahoo).
+- ✅ **Nasdaq** `api.nasdaq.com/api/company/<sym>/insider-trades` — insider obchody, bez klíče, a na
+  rozdíl od dividend endpointu funguje i pro NYSE (ověřeno VICI/JNJ). Viz `lib/nasdaqInsider.ts`.
 - ✅ **Yahoo RSS** `feeds.finance.yahoo.com/rss/2.0/headline?s=<sym>` — novinky.
-- ✅ **Finnhub free** — `profile2` (sektor) + `insider-transactions`. Klíč v `.env.local`. US-centrické.
-- ❌ **Blokované / placené:** Yahoo `query2` a `quoteSummary` (crumb → 401), Stooq (anti-bot), Finnhub
-  `institutional-ownership` a `price-target` (placené). Proto se institucionální držba nedělá.
+- ❌ **Blokované / placené:** Yahoo `query2` a `quoteSummary` (crumb → 401), Stooq (anti-bot).
+  Institucionální držba a cílové ceny nad rámec analytického konsenzu (`lib/analysts.ts`) se proto
+  nedělají — appka nemá placený zdroj na ně.
+- ❌ **Finnhub** (dřív používaný pro sektor + insider obchody, vyžadoval klíč) — nahrazen kompletně
+  bezplatnými zdroji bez klíče (`lib/sector.ts`, `lib/nasdaqInsider.ts`); appka teď nepotřebuje
+  žádný API klíč. `lib/finnhub.ts` smazán.
 - ❌ **SEC EDGAR** (13F filings, Form 4 insider) — fungovalo (zkusili jsme "Smart Money" sekci: Buffett/
   Ackman/Burry 13F + Huang/Musk/Zuckerberg Form 4), ale nakonec **odebráno** — layout byl moc rozsáhlý
   na přínos pro tenhle use case. Kód smazán (`lib/secEdgar.ts`, `lib/thirteenF.ts`, `lib/secInsiders.ts`),
@@ -111,8 +124,8 @@ Zjištěno empiricky (prostředí blokuje část zdrojů):
 Perzistence jde přes `lib/storage.ts` (`readJson`/`writeJson`): **lokálně soubory v `data/`**,
 **na Netlify Netlify Blobs** (read-only FS) — přepíná se podle `process.env.NETLIFY`. Klíče:
 `export.json` + `export-revolut.json` (import per broker), `prices.json`, `symbolMap.json`
-(Yahoo symbol resolution, cache navždy), `fundamentals.json`, `finnhub.json`, `analysts.json`,
-`divcal.json`, `earnings.json`, `cash.json`. Lokálně smazáním souboru vynutíš re-fetch;
+(Yahoo symbol resolution, cache navždy), `fundamentals.json`, `sector.json`, `insider.json`,
+`analysts.json`, `divcal.json`, `earnings.json`, `cash.json`. Lokálně smazáním souboru vynutíš re-fetch;
 „Obnovit ceny" obchází cache cen (a appka se navíc sama obnovuje každých 5 minut).
 Když přidáváš nový cache modul, čti/zapisuj přes `storage.ts`, ne přes `fs` napřímo (jinak spadne na Netlify).
 
@@ -132,11 +145,11 @@ který mění chování appky (feature, fix, odebrání) — ne u čistě dokume
 2. Zvyš `version` v `package.json` (patch = fix, minor = nová featura, major = breaking změna).
 3. Po pushnutí přidej git tag `vX.Y.Z` na ten commit (`git tag vX.Y.Z && git push origin vX.Y.Z`).
 Čistě dokumentační push (jen README/CLAUDE.md) verzi nezvyšuje a nemusí mít changelog záznam.
-Aktuální verze: **1.2.1**. Tagy `v1.1.0`, `v1.2.0`, `v1.2.1` existují jen lokálně — nejsou
-pushnuté na GitHub (jen `v1.0.0` tam je). Až se pushne main, pushni i tagy (`git push origin --tags`).
+Aktuální verze: viz `package.json` / [CHANGELOG.md](CHANGELOG.md) — historie tagů/pushů je popsaná
+v sekci „Aktuální stav" níže, ne natvrdo tady (rychle stárne).
 
 ## Netlify deploy
-`netlify.toml` + `@netlify/plugin-nextjs`. Env proměnné na Netlify: `BASIC_AUTH_*`, `FINNHUB_API_KEY`,
+`netlify.toml` + `@netlify/plugin-nextjs`. Env proměnné na Netlify: `BASIC_AUTH_*`,
 volitelně `CASH_CONFIG_JSON` (spořicí účty jako JSON, protože `data/cash.json` se nedeployuje).
 XTB i Revolut export se na živém webu nahraje ručně (uloží se do Blobs). Build ověříš `npm run build`.
 Commit message `[skip netlify]` zabrání buildu (použij pro čistě dokumentační/metadata pushe).
@@ -166,8 +179,8 @@ Vždy nejdřív ověř dostupnost dat (prostředí blokuje zdroje), teprve pak s
 - **Nasazeno:** https://pb-portfolio-tracker.netlify.app (za basic auth) + veřejné demo bez
   hesla na `/demo` (viz README a sekci Demo níže). Repo: github.com/petrberd/portfolio-tracker.
 - **Git stav:** `main` je s `origin/main` sesynchronizované (poslední push obsahoval mobilní
-  UX revizi + skeleton loading v1.3.0 a senior UX/UI pass v1.4.0). Tagy `v1.0.0`–`v1.4.0`
-  jsou všechny pushnuté.
+  UX revizi + skeleton loading v1.3.0, senior UX/UI pass v1.4.0, veřejné demo + drobné opravy
+  v1.5.0, a odstranění Finnhubu/API klíče v1.6.0). Tagy `v1.0.0`–`v1.6.0` jsou všechny pushnuté.
 - **Revolut import je live-otestovaný** na reálném vzorku uživatele (6 transakcí: CASH TOP-UP, BUY,
   DIVIDEND) — funguje včetně sloučení s XTB, EUR měny, a nedostupných tickerů (4COP, CEBS = evropské
   ETF, vyřešeno Yahoo search fallbackem).
@@ -182,6 +195,11 @@ Vždy nejdřív ověř dostupnost dat (prostředí blokuje zdroje), teprve pak s
   zbytek webu (reálná data na `/`) zůstává chráněný beze změny. Sdílené UI komponenty
   (`Kpi`, `Section`, `HoldingsTable`, …) jsou v `components/PortfolioUI.tsx`, protože Next.js
   nedovolí extra named exporty přímo z `page.tsx` souboru.
+- **Finnhub odstraněn, appka teď nepotřebuje žádný API klíč** — sektor jede přes `lib/sector.ts`
+  (stockanalysis.com), insider obchody přes
+  `lib/nasdaqInsider.ts` (`api.nasdaq.com/api/company/<sym>/insider-trades`, funguje i pro
+  NYSE, ověřeno VICI/JNJ). `lib/finnhub.ts` a `FINNHUB_API_KEY` z `.env.example`/dokumentace
+  smazány.
 - **`lib/transfers.ts`:** některé odchody akcií (dar „Send A Gift Transfer Out") jsou jen v Closed
   Positions, ne v Cash Operations. Detekují se tam a odečítají v positions/timeseries/dividend route
   (FIFO, bez realizovaného P/L).

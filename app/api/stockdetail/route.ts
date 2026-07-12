@@ -4,7 +4,7 @@ import { loadExport } from "@/lib/store";
 import { fetchFundamentals } from "@/lib/fundamentals";
 import { fetchAnalysts } from "@/lib/analysts";
 import { fetchNews } from "@/lib/news";
-import { fetchInsiderTransactions } from "@/lib/finnhub";
+import { fetchInsiderTransactions } from "@/lib/nasdaqInsider";
 import { fetchDividendMeta } from "@/lib/divcalendar";
 
 export const runtime = "nodejs";

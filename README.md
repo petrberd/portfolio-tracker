@@ -1,6 +1,6 @@
 # Portfolio Tracker
 
-[![Version](https://img.shields.io/badge/version-1.5.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue)](CHANGELOG.md)
 
 Lokální webová aplikace na sledování investičního portfolia z **XTB a/nebo Revolutu** —
 po vzoru Alocano / Stonkee. Naimportuje export z brokera(ů), zrekonstruuje aktuální pozice
@@ -24,7 +24,7 @@ za Basic Authem beze změny — jen `/demo` a jeho podpůrné API routy (`/api/d
 
 ```bash
 npm install                 # jednorázově
-cp .env.example .env.local  # volitelně: doplň FINNHUB_API_KEY (free) pro insider + sektory
+cp .env.example .env.local  # volitelně: BASIC_AUTH_* (heslo) — appka nepotřebuje žádný API klíč
 npm run dev                 # http://localhost:3210
 ```
 
@@ -34,9 +34,10 @@ Data zůstávají lokálně ve složce `data/` (negitignorovaná, nesdílí se).
 **Obnovit ceny** stáhne aktuální kurzy.
 
 > Pozn.: appka se dodává **bez dat** — každý si nahraje svůj vlastní export. Basic Auth se
-> vynucuje jen na produkci (Netlify) — lokální `npm run dev` běží bez hesla.
-> Bez `FINNHUB_API_KEY` appka funguje, jen skryje insider obchody a sektorovou alokaci
-> (klíč zdarma na finnhub.io). Kontext pro další vývoj s Claude je v [CLAUDE.md](CLAUDE.md).
+> vynucuje jen na produkci (Netlify) — lokální `npm run dev` běží bez hesla. Appka nepotřebuje
+> žádný API klíč — ceny, dividendy, analytici, sektory i insider obchody jedou přes bezplatné
+> zdroje bez klíče (Yahoo, stockanalysis.com, Nasdaq). Kontext pro další vývoj s Claude je
+> v [CLAUDE.md](CLAUDE.md).
 
 ## Basic auth (skrytí celé stránky)
 
@@ -79,7 +80,6 @@ reálné riziko je zanedbatelné.
 2. Build je hotový přes `netlify.toml` (`@netlify/plugin-nextjs`) — nic ručně nenastavuješ.
 3. V **Site settings → Environment variables** nastav:
    - `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD` — přihlášení k webu
-   - `FINNHUB_API_KEY` — (volitelně) insider + sektory
    - `CASH_CONFIG_JSON` — (volitelně) spořicí účty jako JSON, např.
      `{"interestTaxPct":15,"accounts":[{"name":"Raiffeisenbank","balance":1000000,"ratePct":4}]}`
 4. Perzistence: lokálně soubory v `data/`, na Netlify **Netlify Blobs** (read-only FS) —
@@ -101,7 +101,7 @@ reálné riziko je zanedbatelné.
 - **Volná hotovost** — spořicí účty mimo brokerské účty (`data/cash.json` lokálně /
   `CASH_CONFIG_JSON` na Netlify), oddělená KPI od hotovosti přímo na XTB/Revolut účtu.
   Dlaždice se schová, když žádné externí účty nejsou nastavené.
-- **Alokace** — přepínač Pozice / Sektory (Finnhub) / Měny.
+- **Alokace** — přepínač Pozice / Sektory (stockanalysis.com) / Měny.
 - **Vklady** — měsíční vklady + průměrný vklad za měsíc.
 - **Výkonnost vs. trh** — portfolio (TWR) vs. **S&P 500 Total Return** (`^SP500TR`, vč.
   reinvestovaných dividend — fér srovnání proti portfoliu, které dividendy taky počítá do
@@ -115,7 +115,7 @@ reálné riziko je zanedbatelné.
   cena" (odhad analytiků vs. aktuální cena, barevná škála podhodnoceno → nadhodnoceno).
   Data z stockanalysis.com. Ne investiční doporučení.
 - **Detail titulu** — klik na pozici otevře modal: 2letý cenový graf s tvými nákupy/prodeji,
-  klíčové fundamenty (tržní kap., P/E, tržby, marže), analytici, **insider obchody** (Finnhub)
+  klíčové fundamenty (tržní kap., P/E, tržby, marže), analytici, **insider obchody** (Nasdaq)
   a **newsfeed** (Yahoo RSS).
 - **Earnings kalendář** — kompaktní box (pod Alokací portfolia) s nejbližším termínem
   výsledků pro každý titul v portfoliu (stockanalysis.com); pokud je poslední známé datum
@@ -130,12 +130,12 @@ reálné riziko je zanedbatelné.
   limit 100 000 Kč (hrubý příjem z prodeje CP za kalendářní rok). Orientační výpočet, ne
   daňové poradenství.
 
-Insider obchody a sektory (v detailu titulu) vyžadují **Finnhub API klíč** v `.env.local`
-(`FINNHUB_API_KEY`); free tier stačí. Institucionální držba a cílové ceny (Finnhub) jsou jen
-v placeném tieru — vynechány.
+Sektor i insider obchody jedou přes bezplatné zdroje bez API klíče (stockanalysis.com, Nasdaq).
+Institucionální držba a cílové ceny nad rámec analytického konsenzu se nedělají — appka nemá
+placený zdroj na ně.
 
-> Analytické odhady, earnings kalendář a insider obchody čerpají z US-centrických zdrojů
-> (stockanalysis.com, Finnhub) — u evropských titulů z Revolutu (např. ETF bez US listingu)
+> Analytické odhady, earnings kalendář, sektory a insider obchody čerpají z US-centrických
+> zdrojů (stockanalysis.com, Nasdaq) — u evropských titulů z Revolutu (např. ETF bez US listingu)
 > proto tahle data většinou nebudou k dispozici; appka to poctivě ukáže jako „nedostupné",
 > ne jako chybu. Ceny, FX, pozice, dividendy a daňový časový test fungují pro oba brokery stejně.
 
@@ -182,9 +182,9 @@ Lokálně v `data/` (gitignored), na Netlify přes Netlify Blobs (`lib/storage.t
 
 - `export.json` — poslední naimportovaný XTB export.
 - `export-revolut.json` — poslední naimportovaný Revolut export (volitelné, odděleně od XTB).
-- `prices.json`, `fundamentals.json`, `analysts.json`, `finnhub.json`, `divcal.json`,
-  `earnings.json` — cache jednotlivých datových zdrojů (smaž pro vynucené stažení; TTL se
-  liší modul od modulu, viz komentáře v `lib/`).
+- `prices.json`, `fundamentals.json`, `analysts.json`, `sector.json`, `insider.json`,
+  `divcal.json`, `earnings.json` — cache jednotlivých datových zdrojů (smaž pro vynucené
+  stažení; TTL se liší modul od modulu, viz komentáře v `lib/`).
 - `cash.json` — externí spořicí účty (volitelné, `.env.example`/README výše).
 
 Vše zůstává lokálně, nic se nikam neposílá. Jen pro osobní přehled — není to investiční poradenství.
