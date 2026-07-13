@@ -9,9 +9,12 @@ import { alertTriggered, type PriceAlert } from "./priceAlert";
  * price crosses the target, checked whenever the wishlist is loaded. The
  * client (see components/Wishlist.tsx) additionally fires a browser
  * Notification the first time an alert trips, as long as the tab stays open.
+ *
+ * `createWishlistStore` is a factory (not a singleton) so /demo gets its OWN
+ * store (data/demoWishlist.json) — shared across all anonymous demo visitors,
+ * but must never touch the real portfolio's file. Same pattern as
+ * lib/holdingAlerts.ts / lib/sectionVisibility.ts / lib/sectionOrder.ts.
  */
-
-const CACHE_KEY = "wishlist.json";
 
 export type WishlistAlert = PriceAlert;
 export { alertTriggered };
@@ -23,59 +26,66 @@ export interface WishlistItem {
   alert?: WishlistAlert;
 }
 
-export async function loadWishlist(): Promise<WishlistItem[]> {
-  return (await readJson<WishlistItem[]>(CACHE_KEY)) ?? [];
-}
+export function createWishlistStore(cacheKey: string) {
+  async function loadWishlist(): Promise<WishlistItem[]> {
+    return (await readJson<WishlistItem[]>(cacheKey)) ?? [];
+  }
 
-async function saveWishlist(items: WishlistItem[]): Promise<void> {
-  await writeJson(CACHE_KEY, items);
-}
+  async function saveWishlist(items: WishlistItem[]): Promise<void> {
+    await writeJson(cacheKey, items);
+  }
 
-// Every mutation does read-modify-write against the same file. Two requests
-// in flight at once (e.g. adding a stock right after another, or the click
-// firing twice) can otherwise both read the pre-change list and each write
-// their own version — the second write wins and silently drops the first
-// change. Serializing all mutations through one promise chain closes that
-// race within this process (good enough locally / one Netlify function
-// instance; it won't coordinate across separate concurrent instances).
-let queue: Promise<unknown> = Promise.resolve();
-function serialized<T>(fn: () => Promise<T>): Promise<T> {
-  const result = queue.then(fn, fn);
-  queue = result.then(
-    () => undefined,
-    () => undefined
-  );
-  return result;
-}
+  // Every mutation does read-modify-write against the same file. Two requests
+  // in flight at once (e.g. adding a stock right after another, or the click
+  // firing twice) can otherwise both read the pre-change list and each write
+  // their own version — the second write wins and silently drops the first
+  // change. Serializing all mutations through one promise chain closes that
+  // race within this process (good enough locally / one Netlify function
+  // instance; it won't coordinate across separate concurrent instances).
+  let queue: Promise<unknown> = Promise.resolve();
+  function serialized<T>(fn: () => Promise<T>): Promise<T> {
+    const result = queue.then(fn, fn);
+    queue = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
 
-export function addWishlistItem(symbol: string, name: string): Promise<WishlistItem[]> {
-  return serialized(async () => {
-    const items = await loadWishlist();
-    if (!items.some((i) => i.symbol === symbol)) {
-      items.push({ symbol, name, addedAt: new Date().toISOString() });
+  function addWishlistItem(symbol: string, name: string): Promise<WishlistItem[]> {
+    return serialized(async () => {
+      const items = await loadWishlist();
+      if (!items.some((i) => i.symbol === symbol)) {
+        items.push({ symbol, name, addedAt: new Date().toISOString() });
+        await saveWishlist(items);
+      }
+      return items;
+    });
+  }
+
+  function removeWishlistItem(symbol: string): Promise<WishlistItem[]> {
+    return serialized(async () => {
+      const items = (await loadWishlist()).filter((i) => i.symbol !== symbol);
       await saveWishlist(items);
-    }
-    return items;
-  });
+      return items;
+    });
+  }
+
+  function setWishlistAlert(symbol: string, alert: WishlistAlert | null): Promise<WishlistItem[]> {
+    return serialized(async () => {
+      const items = await loadWishlist();
+      const item = items.find((i) => i.symbol === symbol);
+      if (item) {
+        if (alert) item.alert = alert;
+        else delete item.alert;
+        await saveWishlist(items);
+      }
+      return items;
+    });
+  }
+
+  return { loadWishlist, addWishlistItem, removeWishlistItem, setWishlistAlert };
 }
 
-export function removeWishlistItem(symbol: string): Promise<WishlistItem[]> {
-  return serialized(async () => {
-    const items = (await loadWishlist()).filter((i) => i.symbol !== symbol);
-    await saveWishlist(items);
-    return items;
-  });
-}
-
-export function setWishlistAlert(symbol: string, alert: WishlistAlert | null): Promise<WishlistItem[]> {
-  return serialized(async () => {
-    const items = await loadWishlist();
-    const item = items.find((i) => i.symbol === symbol);
-    if (item) {
-      if (alert) item.alert = alert;
-      else delete item.alert;
-      await saveWishlist(items);
-    }
-    return items;
-  });
-}
+export const { loadWishlist, addWishlistItem, removeWishlistItem, setWishlistAlert } =
+  createWishlistStore("wishlist.json");

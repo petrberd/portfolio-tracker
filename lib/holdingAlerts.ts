@@ -7,39 +7,44 @@ import { type PriceAlert } from "./priceAlert";
  * stocks outside the portfolio. Same alert shape/semantics (see
  * lib/priceAlert.ts): visual highlight + client-side browser Notification,
  * no background worker.
+ *
+ * `createHoldingAlertsStore` is a factory (not a singleton) so the public /demo
+ * page can get its OWN store (see demoHoldingAlerts below) — demo holdings are
+ * real tickers (AAPL, NVDA, MSFT…) that can collide with a real portfolio's
+ * holdings, so demo alerts must never land in the same file as production ones.
  */
-
-const CACHE_KEY = "holdingAlerts.json";
 
 export type HoldingAlerts = Record<string, PriceAlert>; // symbol -> alert
 
-export async function loadHoldingAlerts(): Promise<HoldingAlerts> {
-  return (await readJson<HoldingAlerts>(CACHE_KEY)) ?? {};
+export function createHoldingAlertsStore(cacheKey: string) {
+  async function loadHoldingAlerts(): Promise<HoldingAlerts> {
+    return (await readJson<HoldingAlerts>(cacheKey)) ?? {};
+  }
+
+  // Same serialized read-modify-write protection as wishlist.ts/sectionVisibility.ts —
+  // without it two rapid PATCHes can each read the pre-change file and the second
+  // write silently drops the first.
+  let queue: Promise<unknown> = Promise.resolve();
+  function serialized<T>(fn: () => Promise<T>): Promise<T> {
+    const result = queue.then(fn, fn);
+    queue = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
+
+  function setHoldingAlert(symbol: string, alert: PriceAlert | null): Promise<HoldingAlerts> {
+    return serialized(async () => {
+      const alerts = await loadHoldingAlerts();
+      if (alert) alerts[symbol] = alert;
+      else delete alerts[symbol];
+      await writeJson(cacheKey, alerts);
+      return alerts;
+    });
+  }
+
+  return { loadHoldingAlerts, setHoldingAlert };
 }
 
-async function saveHoldingAlerts(alerts: HoldingAlerts): Promise<void> {
-  await writeJson(CACHE_KEY, alerts);
-}
-
-// Same serialized read-modify-write protection as wishlist.ts/sectionVisibility.ts —
-// without it two rapid PATCHes can each read the pre-change file and the second
-// write silently drops the first.
-let queue: Promise<unknown> = Promise.resolve();
-function serialized<T>(fn: () => Promise<T>): Promise<T> {
-  const result = queue.then(fn, fn);
-  queue = result.then(
-    () => undefined,
-    () => undefined
-  );
-  return result;
-}
-
-export function setHoldingAlert(symbol: string, alert: PriceAlert | null): Promise<HoldingAlerts> {
-  return serialized(async () => {
-    const alerts = await loadHoldingAlerts();
-    if (alert) alerts[symbol] = alert;
-    else delete alerts[symbol];
-    await saveHoldingAlerts(alerts);
-    return alerts;
-  });
-}
+export const { loadHoldingAlerts, setHoldingAlert } = createHoldingAlertsStore("holdingAlerts.json");

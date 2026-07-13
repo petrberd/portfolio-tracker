@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildDemoExport } from "@/lib/demoData";
 import { reconstructPortfolio, type Holding } from "@/lib/positions";
-import { fetchQuote, fetchFxCzk } from "@/lib/prices";
+import { fetchQuote, fetchFxCzk, priceFetchedAt } from "@/lib/prices";
 import { buildValueSeries, computePerformance, computeRiskMetrics, buildBenchmark } from "@/lib/timeseries";
 import { fetchSector } from "@/lib/sector";
+import { createHoldingAlertsStore } from "@/lib/holdingAlerts";
+import { alertTriggered, type PriceAlert } from "@/lib/priceAlert";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Own store, own file (demoHoldingAlerts.json) — see app/api/demo/holding-alerts/route.ts
+// for why demo alerts must never share storage with the real portfolio's.
+const demoHoldingAlerts = createHoldingAlertsStore("demoHoldingAlerts.json");
 
 interface EnrichedHolding extends Holding {
   currency: string;
@@ -18,6 +24,8 @@ interface EnrichedHolding extends Holding {
   sector: string;
   dividendTtmCzk: number;
   yieldOnCostPct: number;
+  alert?: PriceAlert;
+  alertTriggered: boolean;
 }
 
 function trailingDividends(stored: { cashOps: { type: string; ticker: string; amount: number; time: string }[] }): Map<string, number> {
@@ -49,6 +57,7 @@ export async function GET(req: NextRequest) {
 
   const sectors = await Promise.all(summary.holdings.map((h) => fetchSector(h.symbol)));
   const divTtm = trailingDividends(stored);
+  const holdingAlerts = await demoHoldingAlerts.loadHoldingAlerts();
 
   const holdings: EnrichedHolding[] = summary.holdings.map((h, i) => {
     const q = quotes[i];
@@ -56,6 +65,7 @@ export async function GET(req: NextRequest) {
     const marketValueCzk = h.shares * q.price * rate;
     const unrealizedPnlCzk = marketValueCzk - h.czkCostBasis;
     const dividendTtmCzk = divTtm.get(h.ticker) ?? 0;
+    const alert = holdingAlerts[h.symbol];
     return {
       ...h,
       currency: q.currency,
@@ -67,6 +77,8 @@ export async function GET(req: NextRequest) {
       sector: sectors[i] ?? "Ostatní",
       dividendTtmCzk,
       yieldOnCostPct: h.czkCostBasis > 0 ? (dividendTtmCzk / h.czkCostBasis) * 100 : 0,
+      alert,
+      alertTriggered: alertTriggered(alert, q.price),
     };
   });
 
@@ -90,9 +102,16 @@ export async function GET(req: NextRequest) {
 
   const dividendTtmTotal = holdings.reduce((s, h) => s + h.dividendTtmCzk, 0);
 
+  // Same freshness field as /api/portfolio (see that route for why it's not just "now").
+  const fetchedAts = (await Promise.all(summary.holdings.map((h) => priceFetchedAt(h.symbol)))).filter(
+    (t): t is number => t != null
+  );
+  const pricesAsOf = fetchedAts.length ? new Date(Math.min(...fetchedAts)).toISOString() : null;
+
   return NextResponse.json({
     imported: true,
     importedAt: new Date().toISOString(),
+    pricesAsOf,
     accountNumber: stored.accountNumber,
     summary: {
       ...summary,

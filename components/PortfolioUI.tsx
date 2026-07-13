@@ -5,7 +5,7 @@
 // Next.js's typed-routes build fails if a page.tsx file has any named exports
 // beyond its default component and the reserved route-config exports.
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { czk, num, pct, shortDate } from "@/lib/format";
 import { PALETTE } from "@/components/Charts";
 import { InfoTip } from "@/components/InfoTip";
@@ -141,12 +141,27 @@ export function HoldingsTable({
   holdings: any[];
   total: number;
   onSelect: (h: { ticker: string; instrument: string }) => void;
-  /** Omitted on /demo — when absent the per-row alert UI (and its own row expansion) is hidden. */
+  /** Omitted nowhere currently — both `/` and `/demo` pass this; kept optional so a future
+   * read-only embedding of this table doesn't need to wire up alerts. */
   onAlertChange?: (symbol: string, alert: { targetPrice: number; direction: "above" | "below" } | null) => void;
 }) {
   const [editingSymbol, setEditingSymbol] = useState<string | null>(null);
   const [alertPrice, setAlertPrice] = useState("");
   const [alertDir, setAlertDir] = useState<"above" | "below">("above");
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission | "unsupported">("default");
+
+  useEffect(() => {
+    if (typeof Notification === "undefined") {
+      setNotifPerm("unsupported");
+      return;
+    }
+    setNotifPerm(Notification.permission);
+  }, []);
+
+  const requestNotifPermission = async () => {
+    if (typeof Notification === "undefined") return;
+    setNotifPerm(await Notification.requestPermission());
+  };
 
   const openAlertEditor = (h: any) => {
     setEditingSymbol(h.symbol);
@@ -296,6 +311,14 @@ export function HoldingsTable({
           })}
         </tbody>
       </table>
+      {onAlertChange && notifPerm === "default" && (
+        <button
+          onClick={requestNotifPermission}
+          className="text-xs px-2.5 py-1.5 rounded-lg border border-line text-muted hover:bg-panel2 transition mt-3"
+        >
+          🔔 Povolit notifikace v prohlížeči pro alerty
+        </button>
+      )}
     </div>
   );
 }

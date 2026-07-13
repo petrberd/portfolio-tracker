@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadExport } from "@/lib/store";
 import { reconstructPortfolio, type Holding } from "@/lib/positions";
-import { fetchQuote, fetchFxCzk } from "@/lib/prices";
+import { fetchQuote, fetchFxCzk, priceFetchedAt } from "@/lib/prices";
 import { buildValueSeries, computePerformance, computeRiskMetrics, buildBenchmark } from "@/lib/timeseries";
 import { fetchSector } from "@/lib/sector";
 import { loadCash, freeCashTotal } from "@/lib/cash";
@@ -111,9 +111,18 @@ export async function GET(req: NextRequest) {
   const cash = await loadCash();
   const freeCash = freeCashTotal(cash);
 
+  // How fresh the displayed prices really are — the OLDEST cached quote among the
+  // holdings, not "now" (that would lie about staleness on a non-force load), and not
+  // `importedAt` (that's the portfolio import date, an unrelated, much rarer event).
+  const fetchedAts = (await Promise.all(summary.holdings.map((h) => priceFetchedAt(h.symbol)))).filter(
+    (t): t is number => t != null
+  );
+  const pricesAsOf = fetchedAts.length ? new Date(Math.min(...fetchedAts)).toISOString() : null;
+
   return NextResponse.json({
     imported: true,
     importedAt: stored.importedAt,
+    pricesAsOf,
     sourceFile: stored.sourceFile,
     accountNumber: stored.accountNumber,
     summary: {

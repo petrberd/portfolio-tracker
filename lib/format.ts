@@ -15,6 +15,9 @@ export const num = (n: number, digits = 2) =>
 export const shortDate = (iso: string) =>
   new Date(iso).toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" });
 
+export const shortDateTime = (iso: string) =>
+  new Date(iso).toLocaleString("cs-CZ", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
 export const monthLabel = (ym: string) => {
   const [y, m] = ym.split("-");
   return `${m}/${y.slice(2)}`;

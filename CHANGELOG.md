@@ -4,6 +4,46 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.9.0] — 2026-07-13
+
+### Added
+- **Přepínač rozsahu grafu u detailu titulu** — 1 měsíc / 3 měsíce / 1 rok / 5 let místo
+  pevných 2 let (`components/StockDetail.tsx`, `app/api/{stockdetail,demo/stockdetail}`).
+  U 1měsíčního a 3měsíčního pohledu appka stahuje nitrodenní data (15min/60min svíčky
+  místo denních) — na tomhle přiblížení totiž bylo vidět, že nákup/prodej tečky neseděly
+  přesně na křivku (protivník: čára ukazovala denní close, ale obchod se prováděl
+  nitrodenně za jinou cenu). Tečky navíc naskočí s ~1s zpožděním po vykreslení grafu
+  (`lib/notifyAlerts.ts`-style fade-in), místo aby se objevily se vším najednou.
+- **Plná parita `/demo` s produkcí** — wishlist, cenové alerty na pozicích a
+  skrývání/přesouvání sekcí jsou teď i na veřejném demu, každé ve vlastním úložišti
+  (`data/demo{Wishlist,HoldingAlerts,SectionVisibility,SectionOrder}.json`) přes nové
+  `app/api/demo/{wishlist,holding-alerts,section-visibility,section-order}` routy — demo
+  běží nad reálnými tickery, takže tahle data nikdy nesdílí soubor se skutečným
+  portfoliem. `lib/wishlist.ts`, `lib/holdingAlerts.ts`, `lib/sectionVisibility.ts`,
+  `lib/sectionOrder.ts` teď exportují tovární funkci (`createXStore(cacheKey)`) místo
+  singletonu, aby šlo mít produkční i demo instanci zároveň.
+- Tlačítko „Povolit notifikace v prohlížeči" přesunuto ze `Wishlist.tsx` do sdíleného
+  `HoldingsTable` — dřív šlo notifikace povolit jen ze sekce Sledované tituly, i když
+  alert šel nastavit i na vlastních pozicích.
+
+### Fixed
+- **VIX, earnings a dividendový kalendář se needouzovaly** — nikdy neposílaly `?refresh=1`
+  na server (na rozdíl od wishlistu), takže jely na až hodinu starém cache bez ohledu na
+  kliknutí „Obnovit ceny". Tlačítko navíc vůbec nezvedalo `refreshTick`, takže se tyhle
+  panely needouzovaly ani jednou za 5 minut. Opraveno v `MarketMood.tsx`,
+  `EarningsCalendar.tsx`, `DividendCalendar.tsx` + `app/page.tsx`.
+- **„ceny z" v hlavičce ukazovalo datum importu, ne datum cen** — rozděleno na „ceny k"
+  (nové pole `pricesAsOf` z `lib/prices.ts:priceFetchedAt`, reálná čerstvost cen) a
+  „import portfolia" (`importedAt`, kdy byl nahrán XTB/Revolut export).
+- **„oproti včerejšímu uzavření" bylo po víkendu/svátku zavádějící** — v pondělí to ve
+  skutečnosti srovnávalo proti pátečnímu uzavření, ne nedělnímu. `fetchQuote()` teď vrací
+  i skutečné datum použité uzávěrky a appka podle mezery v kalendářních dnech (ne podle
+  dne v týdnu — funguje to i přes svátky) zobrazí „oproti uzavření z {datum}" místo
+  matoucího „včerejšímu".
+- **Wishlist titul tvrdil „tvé obchody", i když žádné neměl** — popisek a legenda
+  nákup/prodej u grafu detailu titulu se teď zobrazí jen když titul v daném rozsahu
+  opravdu má nějaké obchody (relevantní hlavně pro sledované tituly mimo portfolio).
+
 ## [1.8.0] — 2026-07-12
 
 ### Added

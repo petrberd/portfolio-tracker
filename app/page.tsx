@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { czk, pct, shortDate } from "@/lib/format";
+import { czk, pct, shortDate, shortDateTime } from "@/lib/format";
 import {
   AllocationPie,
   BenchmarkChart,
@@ -250,14 +250,18 @@ function PageContent() {
         <div>
           <h1 className="text-2xl font-semibold">Portfolio Tracker</h1>
           <p className="text-muted text-sm mt-1">
-            Účet {data.accountNumber} · {holdings.length} otevřených pozic · ceny z{" "}
+            Účet {data.accountNumber} · {holdings.length} otevřených pozic · ceny k{" "}
+            {data.pricesAsOf ? shortDateTime(data.pricesAsOf) : "—"} · import portfolia{" "}
             {data.importedAt ? shortDate(data.importedAt) : "—"}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center">
             <button
-              onClick={() => load(true)}
+              onClick={() => {
+                load(true);
+                setRefreshTick((t) => t + 1);
+              }}
               disabled={refreshing}
               className={`text-sm px-3 py-2 rounded-xl border transition disabled:opacity-50 ${
                 justRefreshed ? "border-pos/40 text-pos" : "border-line hover:bg-panel2"

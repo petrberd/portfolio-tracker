@@ -22,13 +22,26 @@ function levelFor(vix: number) {
   return VIX_LEVELS.find((l) => vix < l.max) ?? VIX_LEVELS[VIX_LEVELS.length - 1];
 }
 
+/** "oproti včerejšímu uzavření" only actually means yesterday Tue–Fri — after a weekend
+ * (or a holiday) the last close is Friday's (or further back), so say which day instead
+ * of silently mislabeling it. */
+function prevCloseLabel(prevCloseDate: string | undefined, isYesterday: boolean | undefined): string {
+  if (isYesterday) return "oproti včerejšímu uzavření";
+  if (!prevCloseDate) return "oproti poslednímu uzavření";
+  const d = new Date(prevCloseDate).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" });
+  return `oproti uzavření z ${d}`;
+}
+
 export function MarketMood({ refreshTick = 0 }: { refreshTick?: number }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/market", { cache: "no-store" })
+    // refreshTick > 0 means this run was triggered by "Obnovit ceny" or the 5-min
+    // auto-refresh — bypass the server's 1h price cache then, same as the other
+    // panels, so the VIX reading doesn't lag behind a manual/periodic refresh.
+    fetch(`/api/market${refreshTick > 0 ? "?refresh=1" : ""}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => !cancelled && setData(j))
       .catch(() => !cancelled && setData({ available: false }))
@@ -52,7 +65,7 @@ export function MarketMood({ refreshTick = 0 }: { refreshTick?: number }) {
           {data.changePercent != null && (
             <div className={`text-sm mt-1 ${data.changePercent >= 0 ? "text-neg" : "text-pos"}`}>
               {data.changePercent >= 0 ? "+" : ""}
-              {data.changePercent.toFixed(1)} % oproti včerejšímu uzavření
+              {data.changePercent.toFixed(1)} % {prevCloseLabel(data.prevCloseDate, data.prevCloseIsYesterday)}
             </div>
           )}
           <span

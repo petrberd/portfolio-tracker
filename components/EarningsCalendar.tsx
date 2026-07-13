@@ -12,7 +12,9 @@ export function EarningsCalendar({ refreshTick = 0, endpoint = "/api/earnings" }
 
   useEffect(() => {
     let cancelled = false;
-    fetch(endpoint, { cache: "no-store" })
+    // refreshTick > 0 means "Obnovit ceny" or the 5-min auto-refresh triggered this —
+    // bypass the server's price/earnings cache then, same as the other panels.
+    fetch(`${endpoint}${refreshTick > 0 ? "?refresh=1" : ""}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => !cancelled && setData(j))
       .catch(() => !cancelled && setData({ available: false }))

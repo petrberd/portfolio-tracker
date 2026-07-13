@@ -17,41 +17,55 @@ const SectionVisibilityContext = createContext<Ctx | null>(null);
  * Labels for the "restore" list are kept client-side only (not persisted) —
  * they're just whatever title was showing when the section was hidden.
  */
-export function SectionVisibilityProvider({ children }: { children: React.ReactNode }) {
+export function SectionVisibilityProvider({
+  children,
+  endpoint = "/api/section-visibility",
+}: {
+  children: React.ReactNode;
+  /** /demo passes "/api/demo/section-visibility" — its own store, shared across
+   * demo visitors but never touching the real portfolio's. */
+  endpoint?: string;
+}) {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/section-visibility", { cache: "no-store" })
+    fetch(endpoint, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => setHiddenIds(new Set(j.hidden ?? [])))
       .catch(() => {})
       .finally(() => setLoaded(true));
-  }, []);
+  }, [endpoint]);
 
-  const hide = useCallback((id: string, label: string) => {
-    setHiddenIds((prev) => new Set(prev).add(id));
-    setLabels((prev) => ({ ...prev, [id]: label }));
-    fetch("/api/section-visibility", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, hidden: true }),
-    }).catch(() => {});
-  }, []);
+  const hide = useCallback(
+    (id: string, label: string) => {
+      setHiddenIds((prev) => new Set(prev).add(id));
+      setLabels((prev) => ({ ...prev, [id]: label }));
+      fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, hidden: true }),
+      }).catch(() => {});
+    },
+    [endpoint]
+  );
 
-  const show = useCallback((id: string) => {
-    setHiddenIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    fetch("/api/section-visibility", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, hidden: false }),
-    }).catch(() => {});
-  }, []);
+  const show = useCallback(
+    (id: string) => {
+      setHiddenIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, hidden: false }),
+      }).catch(() => {});
+    },
+    [endpoint]
+  );
 
   const isHidden = useCallback((id: string) => hiddenIds.has(id), [hiddenIds]);
   const hiddenList = [...hiddenIds].map((id) => ({ id, label: labels[id] ?? id }));

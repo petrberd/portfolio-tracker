@@ -28,7 +28,19 @@ interface WishlistItem {
   analystCount: number;
 }
 
-export function Wishlist({ onSelect, refreshTick = 0 }: { onSelect: (symbol: string, name: string) => void; refreshTick?: number }) {
+export function Wishlist({
+  onSelect,
+  refreshTick = 0,
+  endpoint = "/api/wishlist",
+  searchEndpoint = "/api/wishlist/search",
+}: {
+  onSelect: (symbol: string, name: string) => void;
+  refreshTick?: number;
+  /** /demo passes "/api/demo/wishlist" — its own store, shared across demo visitors
+   * but never touching the real portfolio's. */
+  endpoint?: string;
+  searchEndpoint?: string;
+}) {
   const [items, setItems] = useState<WishlistItem[] | null>(null);
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -55,7 +67,7 @@ export function Wishlist({ onSelect, refreshTick = 0 }: { onSelect: (symbol: str
   };
 
   const load = (force = false) =>
-    fetch(`/api/wishlist${force ? "?refresh=1" : ""}`, { cache: "no-store" })
+    fetch(`${endpoint}${force ? "?refresh=1" : ""}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => {
         const loaded: WishlistItem[] = j.items ?? [];
@@ -73,7 +85,8 @@ export function Wishlist({ onSelect, refreshTick = 0 }: { onSelect: (symbol: str
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endpoint]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -83,7 +96,7 @@ export function Wishlist({ onSelect, refreshTick = 0 }: { onSelect: (symbol: str
     }
     setSearching(true);
     debounceRef.current = setTimeout(() => {
-      fetch(`/api/wishlist/search?q=${encodeURIComponent(query)}`, { cache: "no-store" })
+      fetch(`${searchEndpoint}?q=${encodeURIComponent(query)}`, { cache: "no-store" })
         .then((r) => r.json())
         .then((j) => setSuggestions(j.results ?? []))
         .finally(() => setSearching(false));
@@ -91,12 +104,12 @@ export function Wishlist({ onSelect, refreshTick = 0 }: { onSelect: (symbol: str
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, searchEndpoint]);
 
   const addItem = async (s: Suggestion) => {
     setQuery("");
     setSuggestions([]);
-    await fetch("/api/wishlist", {
+    await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbol: s.symbol, name: s.name }),
@@ -105,7 +118,7 @@ export function Wishlist({ onSelect, refreshTick = 0 }: { onSelect: (symbol: str
   };
 
   const removeItem = async (symbol: string) => {
-    await fetch(`/api/wishlist?symbol=${encodeURIComponent(symbol)}`, { method: "DELETE" });
+    await fetch(`${endpoint}?symbol=${encodeURIComponent(symbol)}`, { method: "DELETE" });
     load();
   };
 
@@ -118,7 +131,7 @@ export function Wishlist({ onSelect, refreshTick = 0 }: { onSelect: (symbol: str
   const saveAlert = async (symbol: string) => {
     const price = parseFloat(alertPrice.replace(",", "."));
     if (!Number.isFinite(price) || price <= 0) return;
-    await fetch("/api/wishlist", {
+    await fetch(endpoint, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbol, targetPrice: price, direction: alertDir }),
@@ -128,7 +141,7 @@ export function Wishlist({ onSelect, refreshTick = 0 }: { onSelect: (symbol: str
   };
 
   const clearAlert = async (symbol: string) => {
-    await fetch("/api/wishlist", {
+    await fetch(endpoint, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbol, clear: true }),

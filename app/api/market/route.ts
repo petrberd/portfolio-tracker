@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
     available: true,
     vix: q.price,
     changePercent: q.changePercent,
+    prevCloseDate: q.prevCloseDate,
+    prevCloseIsYesterday: q.prevCloseIsYesterday,
     history: history.map((h) => ({ date: h.date, vix: h.close })),
   });
 }

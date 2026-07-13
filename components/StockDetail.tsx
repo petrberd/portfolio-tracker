@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ComposedChart,
   Line,
@@ -13,6 +13,21 @@ import {
 } from "recharts";
 import { InfoTip } from "@/components/InfoTip";
 import { SkeletonBlock } from "@/components/Skeleton";
+import { Toggle } from "@/components/PortfolioUI";
+
+type Range = "1mo" | "3mo" | "1y" | "5y";
+const RANGE_OPTIONS: { value: Range; label: string }[] = [
+  { value: "1mo", label: "1 měsíc" },
+  { value: "3mo", label: "3 měsíce" },
+  { value: "1y", label: "1 rok" },
+  { value: "5y", label: "5 let" },
+];
+const RANGE_TITLE: Record<Range, string> = {
+  "1mo": "Cena za měsíc",
+  "3mo": "Cena za 3 měsíce",
+  "1y": "Cena za rok",
+  "5y": "Cena za 5 let",
+};
 
 const money = (v: number, ccy: string, d = 2) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: ccy || "USD", maximumFractionDigits: d }).format(v ?? 0);
@@ -52,6 +67,20 @@ export function StockDetail({
 }) {
   const [d, setD] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<Range>("1y");
+  const [chartLoading, setChartLoading] = useState(false);
+  const [dotsVisible, setDotsVisible] = useState(false);
+  const rangeInitRef = useRef(false);
+
+  // Buy/sell dots pop in ~1s after the chart line itself, so the line draws in first and
+  // the trade markers read as an annotation on top of it rather than everything appearing
+  // at once. Re-triggers on every fresh `d` (new ticker, or a range switch).
+  useEffect(() => {
+    setDotsVisible(false);
+    if (!d) return;
+    const t = setTimeout(() => setDotsVisible(true), 900);
+    return () => clearTimeout(t);
+  }, [d]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -71,10 +100,13 @@ export function StockDetail({
     };
   }, []);
 
+  // New stock opened (fresh mount, effectively — the modal only renders when there's a
+  // `detail`, so switching tickers unmounts/remounts this component) — full-page skeleton.
   useEffect(() => {
     let cancelled = false;
+    rangeInitRef.current = false;
     setLoading(true);
-    const qs = `ticker=${encodeURIComponent(ticker)}${resolved ? "&resolved=1" : ""}`;
+    const qs = `ticker=${encodeURIComponent(ticker)}${resolved ? "&resolved=1" : ""}&range=${range}`;
     fetch(`${endpoint}?${qs}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => !cancelled && setD(j))
@@ -82,7 +114,28 @@ export function StockDetail({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker, endpoint, resolved]);
+
+  // Range toggle clicked on an already-open modal — refetch just the chart data without
+  // re-showing the full skeleton (fundamentals/analysts/news haven't changed).
+  useEffect(() => {
+    if (!rangeInitRef.current) {
+      rangeInitRef.current = true;
+      return;
+    }
+    let cancelled = false;
+    setChartLoading(true);
+    const qs = `ticker=${encodeURIComponent(ticker)}${resolved ? "&resolved=1" : ""}&range=${range}`;
+    fetch(`${endpoint}?${qs}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => !cancelled && setD(j))
+      .finally(() => !cancelled && setChartLoading(false));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range]);
 
   const ccy = d?.currency ?? "USD";
   const f = d?.fundamentals;
@@ -93,6 +146,7 @@ export function StockDetail({
   const line = (d?.history ?? []).map((h: any) => ({ t: new Date(h.date).getTime(), close: h.close }));
   const buys = (d?.trades ?? []).filter((t: any) => t.side === "buy").map((t: any) => ({ t: new Date(t.date).getTime(), price: t.price }));
   const sells = (d?.trades ?? []).filter((t: any) => t.side === "sell").map((t: any) => ({ t: new Date(t.date).getTime(), price: t.price }));
+  const hasTrades = buys.length > 0 || sells.length > 0;
   const xDomain = line.length ? [line[0].t, line[line.length - 1].t] : [0, 1];
   const allPrices = [...line.map((p: any) => p.close), ...buys.map((b: any) => b.price), ...sells.map((s: any) => s.price)];
   const yMin = allPrices.length ? Math.min(...allPrices) : 0;
@@ -164,16 +218,22 @@ export function StockDetail({
               </div>
             )}
 
-            {/* Price chart with your trades */}
+            {/* Price chart with your trades (if any — wishlist items aren't owned, so they
+                have none; the label/legend below only mention trades when there are some). */}
             <div className="mt-5">
-              <div className="flex items-center justify-between mb-1">
-                <span className="stat-label">Cena za 2 roky · tvé obchody</span>
-                <span className="text-xs text-muted flex gap-3">
-                  <span><span className="inline-block w-2 h-2 rounded-full align-middle mr-1" style={{ background: "#22c55e" }} />nákup</span>
-                  <span><span className="inline-block w-2 h-2 rounded-full align-middle mr-1" style={{ background: "#ef4444" }} />prodej</span>
-                </span>
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <span className="stat-label">{RANGE_TITLE[range]}{hasTrades ? " · tvé obchody" : ""}</span>
+                <div className="flex items-center gap-3 flex-wrap">
+                  {hasTrades && (
+                    <span className="text-xs text-muted flex gap-3">
+                      <span><span className="inline-block w-2 h-2 rounded-full align-middle mr-1" style={{ background: "#22c55e" }} />nákup</span>
+                      <span><span className="inline-block w-2 h-2 rounded-full align-middle mr-1" style={{ background: "#ef4444" }} />prodej</span>
+                    </span>
+                  )}
+                  <Toggle value={range} onChange={(v) => setRange(v as Range)} options={RANGE_OPTIONS} />
+                </div>
               </div>
-              <ResponsiveContainer width="100%" height={260}>
+              <ResponsiveContainer width="100%" height={260} className={chartLoading ? "opacity-50 transition-opacity" : "transition-opacity"}>
                 <ComposedChart data={line} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1b2438" vertical={false} />
                   <XAxis
@@ -181,7 +241,11 @@ export function StockDetail({
                     type="number"
                     domain={xDomain}
                     tick={{ fill: "#8b98b8", fontSize: 11 }}
-                    tickFormatter={(t) => new Date(t).toLocaleDateString("cs-CZ", { month: "short", year: "2-digit" })}
+                    tickFormatter={(t) =>
+                      range === "1mo" || range === "3mo"
+                        ? new Date(t).toLocaleDateString("cs-CZ", { day: "numeric", month: "short" })
+                        : new Date(t).toLocaleDateString("cs-CZ", { month: "short", year: "2-digit" })
+                    }
                     minTickGap={44}
                   />
                   <YAxis
@@ -194,16 +258,42 @@ export function StockDetail({
                     contentStyle={{ background: "#131a2a", border: "1px solid #26304a", borderRadius: 12, fontSize: 13 }}
                     itemStyle={{ color: "#e6ebf5" }}
                     labelStyle={{ color: "#f0f3fa", fontWeight: 600 }}
-                    labelFormatter={(t) => shortDate(new Date(t as number).toISOString())}
+                    labelFormatter={(t) =>
+                      range === "1mo" || range === "3mo"
+                        ? new Date(t as number).toLocaleString("cs-CZ", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+                        : shortDate(new Date(t as number).toISOString())
+                    }
                     formatter={(v: number) => [money(v, ccy), "Cena"]}
                   />
                   <Line type="monotone" dataKey="close" stroke="#7ea2ff" strokeWidth={2.2} dot={false} name="close" />
-                  {buys.map((b: any, i: number) => (
-                    <ReferenceDot key={`b${i}`} x={b.t} y={b.price} r={3.5} fill="#22c55e" stroke="#0b0f19" strokeWidth={1} ifOverflow="extendDomain" />
-                  ))}
-                  {sells.map((s: any, i: number) => (
-                    <ReferenceDot key={`s${i}`} x={s.t} y={s.price} r={3.5} fill="#ef4444" stroke="#0b0f19" strokeWidth={1} ifOverflow="extendDomain" />
-                  ))}
+                  {dotsVisible &&
+                    buys.map((b: any, i: number) => (
+                      <ReferenceDot
+                        key={`b${i}`}
+                        x={b.t}
+                        y={b.price}
+                        r={3.5}
+                        fill="#22c55e"
+                        stroke="#0b0f19"
+                        strokeWidth={1}
+                        ifOverflow="extendDomain"
+                        className="animate-[fadein_.4s_ease-out]"
+                      />
+                    ))}
+                  {dotsVisible &&
+                    sells.map((s: any, i: number) => (
+                      <ReferenceDot
+                        key={`s${i}`}
+                        x={s.t}
+                        y={s.price}
+                        r={3.5}
+                        fill="#ef4444"
+                        stroke="#0b0f19"
+                        strokeWidth={1}
+                        ifOverflow="extendDomain"
+                        className="animate-[fadein_.4s_ease-out]"
+                      />
+                    ))}
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

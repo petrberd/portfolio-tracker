@@ -1,6 +1,6 @@
 # Portfolio Tracker
 
-[![Version](https://img.shields.io/badge/version-1.7.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.9.0-blue)](CHANGELOG.md)
 
 Lokální webová aplikace na sledování investičního portfolia z **XTB a/nebo Revolutu** —
 po vzoru Alocano / Stonkee. Naimportuje export z brokera(ů), zrekonstruuje aktuální pozice
@@ -19,6 +19,10 @@ jsou živé (stejné API jako ostrá appka), ale počty kusů, nákupní ceny a 
 jsou vymyšlené (`lib/demoData.ts`). Zbytek webu (`/`, kořenová appka s reálnými daty) zůstává
 za Basic Authem beze změny — jen `/demo` a jeho podpůrné API routy (`/api/demo/*`,
 `/api/market`, `/api/analysts`) jsou v `middleware.ts` výslovně veřejné.
+
+Demo má funkčně plnou paritu s ostrou appkou — včetně wishlistu, cenových alertů (i na
+pozicích) a skrývání/přesouvání sekcí — každé ve vlastním úložišti (`data/demo*.json`),
+sdíleném mezi všemi návštěvníky dema (bez přihlašování), nikdy ne se skutečným portfoliem.
 
 ## Spuštění
 
@@ -108,15 +112,21 @@ reálné riziko je zanedbatelné.
   výkonnosti) + rizikové metriky (roční výnos, volatilita, max. pokles, Sharpe ratio).
 - **Nálada trhu** — VIX (index očekávané volatility S&P 500, „index strachu") — aktuální
   hodnota s gaugem a klasifikací klid/nervozita/strach/panika, plus graf historie
-  (~6 měsíců, denní data) s referenčními čarami na úrovních 20/30.
+  (~6 měsíců, denní data) s referenčními čarami na úrovních 20/30. Denní změna se popisuje
+  „oproti včerejšímu uzavření" jen když poslední uzávěrka opravdu byla včera — po víkendu
+  nebo svátku appka napíše skutečné datum („oproti uzavření z 10. 7."), aby to nebylo
+  zavádějící.
 
 ### Analýza a výhled
 - **Analytické odhady** — rozpad doporučení (silný nákup … silný prodej) + gauge „Férová
   cena" (odhad analytiků vs. aktuální cena, barevná škála podhodnoceno → nadhodnoceno).
   Data z stockanalysis.com. Ne investiční doporučení.
-- **Detail titulu** — klik na pozici otevře modal: 2letý cenový graf s tvými nákupy/prodeji,
-  klíčové fundamenty (tržní kap., P/E, tržby, marže), analytici, **insider obchody** (Nasdaq)
-  a **newsfeed** (Yahoo RSS).
+- **Detail titulu** — klik na pozici (nebo sledovaný titul) otevře modal: cenový graf
+  s přepínačem rozsahu (1 měsíc / 3 měsíce / 1 rok / 5 let — u 1 měsíce a 3 měsíců appka
+  stahuje nitrodenní data, aby nákup/prodej tečky seděly přesně na křivku, ne jen na denní
+  close), tvé nákupy/prodeje (jen pokud titul v daném rozsahu nějaké má — u sledovaných
+  titulů mimo portfolio se nezobrazují), klíčové fundamenty (tržní kap., P/E, tržby, marže),
+  analytici, **insider obchody** (Nasdaq) a **newsfeed** (Yahoo RSS).
 - **Earnings kalendář** — kompaktní box (pod Alokací portfolia) s nejbližším termínem
   výsledků pro každý titul v portfoliu (stockanalysis.com); pokud je poslední známé datum
   už v minulosti, appka ho odhadne o ~91 dní dopředu (typická čtvrtletní kadence) a označí
@@ -210,6 +220,12 @@ Lokálně v `data/` (gitignored), na Netlify přes Netlify Blobs (`lib/storage.t
 - `holdingAlerts.json` — cenové alerty na vlastních pozicích (klíčováno Yahoo symbolem).
 - `sectionVisibility.json`, `sectionOrder.json` — které sekce dashboardu jsou skryté a
   v jakém pořadí se zobrazují (viz „Přizpůsobení dashboardu" výše).
+- `demoWishlist.json`, `demoHoldingAlerts.json`, `demoSectionVisibility.json`,
+  `demoSectionOrder.json` — stejný wishlist / cenové alerty / skrývání / přesouvání
+  sekcí, ale pro veřejné demo (`/demo`), ve vlastních souborech, oddělených od produkce
+  a sdílených mezi všemi návštěvníky dema (bez přihlašování). Demo běží nad reálnými
+  tickery (AAPL, NVDA, MSFT…), takže tahle data musí zůstat oddělená od skutečného
+  portfolia.
 
 Vše zůstává lokálně, nic se nikam neposílá. Jen pro osobní přehled — není to investiční poradenství.
 

@@ -184,6 +184,14 @@ async function fetchChartRaw(symbol: string): Promise<Chart | null> {
   };
 }
 
+/** When the cached price for `symbol` was last actually fetched (ms epoch), or null if
+ * never cached. Used to show how fresh the displayed prices really are — distinct from
+ * "when was the portfolio last imported" (that's a separate, much rarer event). */
+export async function priceFetchedAt(symbol: string): Promise<number | null> {
+  const c = await loadCache();
+  return c[symbol]?.fetchedAt ?? null;
+}
+
 /**
  * Fetch (and cache) the chart for one symbol. `force` bypasses the cache.
  * Resolves the symbol first (see resolveSymbol) so bare tickers without an
@@ -210,19 +218,72 @@ export async function fetchChart(symbol: string, force = false): Promise<Chart |
   }
 }
 
+/** Yahoo chart `range` string -> cutoff ISO date (YYYY-MM-DD) that far back from today.
+ * Used by the stock detail routes to filter the chart-cache fallback and the buy/sell
+ * trade markers to the same window as the (separately fetched) daily-close range, so a
+ * "1 měsíc" chart doesn't show trade dots from three years ago. */
+export function rangeCutoffDate(range: string): string {
+  const cutoff = new Date();
+  switch (range) {
+    case "1mo":
+      cutoff.setUTCMonth(cutoff.getUTCMonth() - 1);
+      break;
+    case "3mo":
+      cutoff.setUTCMonth(cutoff.getUTCMonth() - 3);
+      break;
+    case "5y":
+      cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 5);
+      break;
+    case "1y":
+    default:
+      cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 1);
+      break;
+  }
+  return cutoff.toISOString().slice(0, 10);
+}
+
+/** Yahoo chart `range` -> the finest `interval` Yahoo allows for it (used by the stock
+ * detail routes so 1mo/3mo charts get real intraday movement — see fetchDailyCloses'
+ * doc for why). Yahoo's own interval/range ceilings: 15m data only goes back ~60 days,
+ * 60m goes back ~730 days — so 1mo can use 15m but 3mo needs to step down to 60m.
+ * 1y/5y stay daily; hourly candles over a year would be a lot of data for no visible
+ * benefit (the day-to-day price swing dwarfs any intraday-vs-close gap at that zoom). */
+export function rangeIntradayInterval(range: string): string {
+  switch (range) {
+    case "1mo":
+      return "15m";
+    case "3mo":
+      return "60m";
+    default:
+      return "1d";
+  }
+}
+
 /**
- * Daily closes for a shorter range (e.g. "2y"), fetched fresh — `range=max`
- * returns only monthly granularity, too coarse for a detail chart. Resolves
- * the symbol the same way fetchChart does (shared cache, so this is a no-op
+ * Closes for a shorter range (e.g. "2y"), fetched fresh — `range=max` returns
+ * only monthly granularity, too coarse for a detail chart. Resolves the
+ * symbol the same way fetchChart does (shared cache, so this is a no-op
  * lookup once fetchChart has already resolved it for this ticker).
+ *
+ * `interval` defaults to daily ("1d"), in which case `date` is truncated to
+ * YYYY-MM-DD (one point per day, matching every other daily-close consumer).
+ * Passing an intraday interval (e.g. "15m"/"60m" — see rangeIntradayInterval)
+ * keeps the full timestamp instead, so a short-range detail chart can show
+ * genuine intraday movement rather than one flat point per day; that in turn
+ * lets a buy/sell marker at its exact execution time land close to the line
+ * instead of being compared against the day's *closing* price, which is what
+ * made trade dots look "off" on the 1mo/3mo stock-detail chart (reported by
+ * Petr 2026-07-13 — visible there because the price swings shown are small
+ * enough that an intraday vs. close difference stands out; invisible on
+ * 1y/5y where the y-axis spans a much wider range).
  */
-export async function fetchDailyCloses(symbol: string, range = "2y"): Promise<DailyClose[]> {
+export async function fetchDailyCloses(symbol: string, range = "2y", interval = "1d"): Promise<DailyClose[]> {
   if (!symbol) return [];
   try {
     const resolved = await resolveSymbol(symbol);
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
       resolved
-    )}?interval=1d&range=${range}`;
+    )}?interval=${interval}&range=${range}`;
     const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 3600 } });
     if (!res.ok) throw new Error(`Yahoo HTTP ${res.status}`);
     const json: any = await res.json();
@@ -231,7 +292,10 @@ export async function fetchDailyCloses(symbol: string, range = "2y"): Promise<Da
     const q = result?.indicators?.quote?.[0]?.close ?? [];
     const out: DailyClose[] = [];
     for (let i = 0; i < ts.length; i++) {
-      if (q[i] != null) out.push({ date: new Date(ts[i] * 1000).toISOString().slice(0, 10), close: q[i] });
+      if (q[i] != null) {
+        const iso = new Date(ts[i] * 1000).toISOString();
+        out.push({ date: interval === "1d" ? iso.slice(0, 10) : iso, close: q[i] });
+      }
     }
     return out;
   } catch (e) {
@@ -251,7 +315,7 @@ export async function fetchHistory(symbol: string, from: string, force = false):
 /**
  * Latest price + true day-over-day % change: the live `regularMarketPrice`
  * against the most recent *completed* daily close (yesterday's close — or
- * Friday's, over a weekend).
+ * Friday's, over a weekend/holiday — see `prevCloseIsYesterday` below).
  *
  * Needs genuinely daily-granularity closes: `chart.closes` (from `fetchChart`,
  * a range=max request) is only MONTHLY, so a "previous" bar found there was
@@ -263,23 +327,36 @@ export async function fetchHistory(symbol: string, from: string, force = false):
 export async function fetchQuote(
   symbol: string,
   force = false
-): Promise<{ price: number; changePercent: number; currency: string }> {
+): Promise<{
+  price: number;
+  changePercent: number;
+  currency: string;
+  /** ISO date (YYYY-MM-DD) of the close `changePercent` is measured against. */
+  prevCloseDate: string;
+  /** False when the gap to `prevCloseDate` is more than 1 calendar day — a
+   * weekend or holiday, so callers displaying e.g. "vs. yesterday's close"
+   * (see MarketMood.tsx) know to say which day it actually was instead. */
+  prevCloseIsYesterday: boolean;
+}> {
   const chart = await fetchChart(symbol, force);
-  if (!chart) return { price: 0, changePercent: 0, currency: "USD" };
+  if (!chart) return { price: 0, changePercent: 0, currency: "USD", prevCloseDate: "", prevCloseIsYesterday: true };
   const current = chart.price || chart.closes[chart.closes.length - 1]?.close || 0;
 
   const daily = await fetchDailyCloses(symbol, "5d");
   const n = daily.length;
   const lastDate = daily[n - 1]?.date ?? "";
   let prev = daily[n - 2]?.close ?? current;
+  let prevDate = daily[n - 2]?.date ?? "";
   for (let i = n - 1; i >= 0; i--) {
     if (daily[i].date < lastDate) {
       prev = daily[i].close;
+      prevDate = daily[i].date;
       break;
     }
   }
   const change = prev ? ((current - prev) / prev) * 100 : 0;
-  return { price: current, changePercent: change, currency: chart.currency };
+  const gapDays = lastDate && prevDate ? Math.round((new Date(lastDate).getTime() - new Date(prevDate).getTime()) / 86400000) : 1;
+  return { price: current, changePercent: change, currency: chart.currency, prevCloseDate: prevDate, prevCloseIsYesterday: gapDays <= 1 };
 }
 
 /** CZK per 1 unit of `currency` (e.g. USD -> ~21). */

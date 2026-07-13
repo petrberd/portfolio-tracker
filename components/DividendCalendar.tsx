@@ -15,7 +15,9 @@ export function DividendCalendar({ refreshTick = 0, endpoint = "/api/dividends" 
 
   useEffect(() => {
     let cancelled = false;
-    fetch(endpoint, { cache: "no-store" })
+    // refreshTick > 0 means "Obnovit ceny" or the 5-min auto-refresh triggered this —
+    // bypass the server's price/dividend cache then, same as the other panels.
+    fetch(`${endpoint}${refreshTick > 0 ? "?refresh=1" : ""}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => !cancelled && setD(j))
       .catch(() => !cancelled && setD({ available: false }))

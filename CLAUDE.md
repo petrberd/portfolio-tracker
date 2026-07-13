@@ -36,8 +36,16 @@ Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind 
   (pro daňový časový test) a roční hrubý příjem z prodejů (`taxYearSoldCzk`).
 - `lib/taxtest.ts` — časový test (§4/1/w ZDP): exemptDate = nákup + 3 roky + 1 den, po FIFO tranších.
   Čistě výpočetní, žádné externí volání.
-- `lib/prices.ts` — ceny z Yahoo. `fetchChart` (range=max, cachováno 1h), `fetchDailyCloses` (denní,
-  pro detailní grafy i pro skutečnou denní % změnu), `fetchQuote`, `fetchFxCzk`. FX páry `USDCZK=X`.
+- `lib/prices.ts` — ceny z Yahoo. `fetchChart` (range=max, cachováno 1h), `fetchDailyCloses`
+  (`interval` volitelný, default denní `1d` — pro detailní grafy i pro skutečnou denní %
+  změnu; nedenní `interval` např. `15m`/`60m` vrací plný ISO timestamp místo useknutého
+  data, viz `rangeIntradayInterval` níže), `fetchQuote` (vrací i `prevCloseDate` +
+  `prevCloseIsYesterday` — false po víkendu/svátku, kdy poslední uzávěrka NENÍ včerejší;
+  `MarketMood.tsx` podle toho volí text „oproti včerejšímu" vs. „oproti uzavření z {datum}"),
+  `fetchFxCzk`, `priceFetchedAt` (kdy byla cena naposledy skutečně stažena — `pricesAsOf`
+  v hlavičce dashboardu), `rangeCutoffDate`/`rangeIntradayInterval` (mapování
+  1mo/3mo/1y/5y na cutoff datum resp. Yahoo interval — použito v `app/api/{stockdetail,
+  demo/stockdetail}` pro přepínač rozsahu grafu detailu titulu). FX páry `USDCZK=X`.
   **Symbol resolution:** když holý ticker (Revolut bez burzovní přípony, nebo XTB burza mimo
   `yahooSymbol()`'s allowlist) nemá na Yahoo data, appka se zeptá Yahoo search API
   (`/v1/finance/search`) a vezme první fungující výsledek — cachováno natrvalo v `symbolMap.json`.
@@ -71,12 +79,22 @@ Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind 
 - `lib/wishlist.ts` — sledované tituly mimo portfolio (symbol, jméno, volitelný alert
   target/direction) v `data/wishlist.json`. Read-modify-write mutace serializované přes promise
   frontu (stejný vzor jako sectionVisibility/sectionOrder níže) — bez toho by dva rychlé zápisy
-  za sebou mohly jeden druhého přepsat (byl to reálný bug, opraveno).
+  za sebou mohly jeden druhého přepsat (byl to reálný bug, opraveno). Exportuje
+  `createWishlistStore(cacheKey)` (tovární funkce, ne singleton) — `/demo` má VLASTNÍ instanci
+  nad `data/demoWishlist.json` (`app/api/demo/wishlist`, `app/api/demo/wishlist/search`),
+  sdílenou mezi všemi návštěvníky dema, nikdy ne se skutečným portfoliem.
+  `components/Wishlist.tsx` má proto volitelné `endpoint`/`searchEndpoint` propy (výchozí
+  produkční cesty).
 - `lib/holdingAlerts.ts` — stejný alert mechanismus jako wishlist, ale pro VLASTNĚNÉ pozice,
   klíčováno Yahoo symbolem (`data/holdingAlerts.json`), ne watch-listem — appka nemá důvod
   nutit uživatele přidat vlastní pozici do wishlistu, jen aby na ni mohl nastavit alert.
   `/api/portfolio` obohacuje každou pozici o `alert` + `alertTriggered` (viz
-  `app/api/holding-alerts` pro PATCH set/clear).
+  `app/api/holding-alerts` pro PATCH set/clear). Exportuje `createHoldingAlertsStore(cacheKey)`
+  (tovární funkce, ne singleton) — `/demo` si vytváří VLASTNÍ instanci nad
+  `data/demoHoldingAlerts.json` (`app/api/demo/holding-alerts`), protože demo běží nad
+  reálnými tickery (AAPL, NVDA, MSFT…), které se mohou shodovat se skutečnými pozicemi —
+  sdílet stejný soubor by znamenalo, že cizí demo alert na NVDA se objeví i ve skutečném
+  portfoliu (a naopak).
 - `lib/notifyAlerts.ts` — klientský (browser) helper sdílený `components/Wishlist.tsx` a
   `app/page.tsx`: jakmile se alert poprvé spustí (`triggered: true`), pošle
   `new Notification(...)` (pokud má uživatel povolené prohlížečové notifikace). Dedup přes
@@ -88,13 +106,28 @@ Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind 
 - `lib/sectionVisibility.ts` / `lib/sectionOrder.ts` — které sekce dashboardu jsou skryté a v jakém
   pořadí se zobrazují (`data/sectionVisibility.json`, `data/sectionOrder.json`), stejná
   serializovaná read-modify-write ochrana. Persistováno na serveru (ne localStorage), aby se
-  nastavení drželo napříč zařízeními.
+  nastavení drželo napříč zařízeními. Stejně jako `lib/holdingAlerts.ts`/`lib/wishlist.ts` obě
+  exportují tovární funkci (`createSectionVisibilityStore(cacheKey)` /
+  `createSectionOrderStore(cacheKey, defaultOrder)`) — `/demo` má VLASTNÍ instance nad
+  `data/demoSectionVisibility.json` / `data/demoSectionOrder.json` (STEJNÝ výchozí pořadí jako
+  produkce, vč. `"wishlist"` bloku — demo teď wishlist sekci má), sdílené mezi všemi
+  návštěvníky dema, ale nikdy ne se skutečným portfoliem. `components/SectionVisibility.tsx` /
+  `components/SectionOrder.tsx` mají proto volitelný `endpoint` prop (výchozí produkční cesta),
+  `/demo` posílá `/api/demo/section-visibility` a `/api/demo/section-order`.
 - API routy: `app/api/{import,portfolio,analysts,stockdetail,dividends,earnings,market,wishlist,
   holding-alerts,section-visibility,section-order}` — čtou libs, cachují do `data/*.json`.
   `wishlist/search` (autocomplete přes `searchSymbols()` v `lib/prices.ts`) a `wishlist`,
   `holding-alerts`, `section-visibility`, `section-order` NEJSOU v `middleware.ts`'s
   `PUBLIC_PATHS` — zůstávají za Basic Authem, protože jde o osobní data/preference, ne obecné
-  tržní info.
+  tržní info. **Demo paritа (2026-07-13): `/demo` má teď VŠECHNO co produkce** — wishlist,
+  cenové alerty (wishlist i pozice), skrývání/přesouvání sekcí, market data/čerstvost cen —
+  každé přes vlastní `app/api/demo/*` routu a vlastní `data/demo*.json` soubor (nikdy sdílené
+  s produkcí — demo běží nad reálnými tickery jako AAPL/NVDA/MSFT, které se mohou shodovat se
+  skutečnými pozicemi). Sdílené komponenty (`MarketMood`, `EarningsCalendar`, `DividendCalendar`,
+  `Wishlist`, `SectionVisibility`, `SectionOrder`, `HoldingsTable`) mají k tomu volitelné
+  `endpoint`/`searchEndpoint`/`defaultOrder` propy — page-level wiring (`onClick`, hlavička,
+  tvar API odpovědi, které endpointy se posílají) je ale pořád nutné upravit ručně na obou
+  místech (`app/page.tsx` i `app/demo/page.tsx`), sdílené komponenty to samy nezajistí.
 - UI: `app/page.tsx` (dashboard) + `components/` (Charts, Analysts, StockDetail, DividendCalendar,
   EarningsCalendar, MarketMood, Wishlist, Gauge — sdílený semicircle gauge pro Férovou cenu i VIX;
   PortfolioUI — sdílené Kpi/Section/HoldingsTable/atd. pro `/` i `/demo`; SectionVisibility a
@@ -143,6 +176,14 @@ Zjištěno empiricky (prostředí blokuje část zdrojů):
 - **Denní % změna** (OPRAVENO) — dřív se počítala z `chart.closes` (měsíční granularita `range=max`),
   takže to bylo ve skutečnosti meziměsíční srovnání, ne denní. Teď se počítá ze skutečných denních dat
   (`fetchDailyCloses`), postihovalo to všechny pozice i VIX.
+- **„Oproti včerejšímu uzavření"** (OPRAVENO) — v pondělí (nebo po svátku) to ve skutečnosti
+  srovnávalo proti pátečnímu, ne včerejšímu uzavření, ale text to netvrdil. `fetchQuote()` teď
+  počítá mezeru v kalendářních dnech mezi dnešní a použitou uzávěrkou (`prevCloseIsYesterday`)
+  — funguje to obecně přes víkendy i svátky, není to natvrdo „pokud pondělí pak pátek".
+- **Detail titulu — přepínač rozsahu grafu** (1mo/3mo/1y/5y) — u krátkých rozsahů (1mo/3mo) se
+  místo denních dat stahuje nitrodenní granularita (`rangeIntradayInterval`: 15m/60m), protože na
+  tomhle přiblížení šel poznat rozdíl mezi denním close a skutečnou cenou obchodu — nákup/prodej
+  tečky (uložené s plným timestampem, ne useknuté na den) tak sedí na křivku, ne vedle ní.
 - **Daňový časový test** — orientační, ne daňové poradenství. Neřeší rozšířený test pro velké majetky
   (~40 mil. Kč) zavedený 2025 (portfolio této velikosti se do toho nedostane).
 - **Fair Price / VIX gauge** — sdílená `SemiGauge` komponenta (`components/Gauge.tsx`). Fair Price je
@@ -172,7 +213,9 @@ Od v1.0.0 (2026-07-11) se appka verzuje: [Keep a Changelog](https://keepachangel
 v `CHANGELOG.md` + [SemVer](https://semver.org/) v `package.json`. **Při každém pushi na GitHub**,
 který mění chování appky (feature, fix, odebrání) — ne u čistě dokumentačních změn:
 1. Přidej záznam do `CHANGELOG.md` (Added/Fixed/Changed/Removed) pod novou verzí nahoře.
-2. Zvyš `version` v `package.json` (patch = fix, minor = nová featura, major = breaking změna).
+2. Zvyš `version` v `package.json` (patch = fix, minor = nová featura, major = breaking změna)
+   **a badge na začátku `README.md`** (`img.shields.io/badge/version-X.Y.Z-blue`) — snadno se
+   zapomene, protože je jen na jednom řádku nahoře; zůstal jednou pozadu o celou verzi.
 3. Po pushnutí přidej git tag `vX.Y.Z` na ten commit (`git tag vX.Y.Z && git push origin vX.Y.Z`).
 Čistě dokumentační push (jen README/CLAUDE.md) verzi nezvyšuje a nemusí mít changelog záznam.
 Aktuální verze: viz `package.json` / [CHANGELOG.md](CHANGELOG.md) — historie tagů/pushů je popsaná
@@ -206,14 +249,25 @@ Vždy nejdřív ověř dostupnost dat (prostředí blokuje zdroje), teprve pak s
   accessibility tree / curl / DOM inspekci přes `javascript_tool`.
 - **Basic Auth lokálně otravovalo** — proto teď middleware v dev módu vůbec neběží (viz výše).
 
-## Aktuální stav (2026-07-12)
+## Aktuální stav (2026-07-13)
 - **Nasazeno:** https://pb-portfolio-tracker.netlify.app (za basic auth) + veřejné demo bez
   hesla na `/demo` (viz README a sekci Demo níže). Repo: github.com/petrberd/portfolio-tracker.
 - **Git stav:** `main` je s `origin/main` sesynchronizované (poslední push obsahoval mobilní
   UX revizi + skeleton loading v1.3.0, senior UX/UI pass v1.4.0, veřejné demo + drobné opravy
   v1.5.0, odstranění Finnhubu/API klíče v1.6.0, wishlist + skrývání/přesouvání sekcí v1.7.0,
-  a notifikace prohlížeče + alerty na pozicích v1.8.0). Tagy `v1.0.0`–`v1.7.0` jsou pushnuté;
-  `v1.8.0` viz commit historie (může být pushnutý s `[skip netlify]`, aby nespustil deploy).
+  notifikace prohlížeče + alerty na pozicích v1.8.0, a plná demo parita + přepínač rozsahu
+  grafu + drobné opravy VIX/cen v1.9.0). Tagy `v1.0.0`–`v1.8.0` jsou pushnuté; `v1.9.0` viz
+  commit historie (může být pushnutý s `[skip netlify]`, aby nespustil deploy).
+- **Demo paritа (v1.9.0)** — `/demo` má teď funkčně VŠECHNO co produkce, včetně wishlistu,
+  cenových alertů na pozicích a skrývání/přesouvání sekcí, každé ve vlastní instanci přes
+  tovární funkce (`createWishlistStore`, `createHoldingAlertsStore`,
+  `createSectionVisibilityStore`, `createSectionOrderStore`) nad odděleným
+  `data/demo*.json` souborem — nikdy sdíleným s produkcí (demo běží nad reálnými tickery,
+  které by se mohly shodovat se skutečnými pozicemi/wishlistem). API routy přibyly pod
+  `app/api/demo/{wishlist,wishlist/search,holding-alerts,section-visibility,section-order}`.
+  Petr o tohle žádal opakovaně (nejdřív notifikace, pak skrývání/přesouvání, pak wishlist) —
+  bereme to teď jako výchozí očekávání pro JAKOUKOLI budoucí featuru na tomhle projektu,
+  ne něco, co je potřeba znovu žádat.
 - **Notifikace prohlížeče pro alerty (v1.8.0)** — Petr to nejdřív testoval bez povoleného
   systémového oprávnění (macOS Nastavení → Oznámení → Chrome bylo vypnuté) a bez restartu
   Chromu po zapnutí — obojí bylo potřeba, appka sama fungovala správně od začátku. Ověřeno
@@ -228,13 +282,16 @@ Vždy nejdřív ověř dostupnost dat (prostředí blokuje zdroje), teprve pak s
   syntetickým portfoliem (`lib/demoData.ts`): reálné tickery (Apple, Microsoft, Nvidia, Amazon,
   Coca-Cola, J&J, Realty Income, Disney), vymyšlené kusy/ceny/historie transakcí. Ceny, dividendy,
   earnings i novinky jdou přes stejné živé zdroje jako produkce. Vlastní API routy pod
-  `app/api/demo/{portfolio,dividends,earnings,stockdetail}` — zrcadlí produkční routy, jen čtou
-  `buildDemoExport()` místo `loadExport()`. `/api/market` a `/api/analysts` se používají beze
-  změny (jsou obecné, bez vazby na konkrétní portfolio). `middleware.ts` má `PUBLIC_PATHS`
-  (`/demo`, `/api/demo/`, `/api/market`, `/api/analysts`), které obchází Basic Auth i na produkci —
-  zbytek webu (reálná data na `/`, vč. wishlist/section-visibility/section-order) zůstává chráněný
-  beze změny. Sdílené UI komponenty (`Kpi`, `Section`, `HoldingsTable`, …) jsou v
-  `components/PortfolioUI.tsx`, protože Next.js nedovolí extra named exporty přímo z `page.tsx`.
+  `app/api/demo/{portfolio,dividends,earnings,stockdetail,wishlist,wishlist/search,
+  holding-alerts,section-visibility,section-order}` — zrcadlí produkční routy (buď čtou
+  `buildDemoExport()` místo `loadExport()`, nebo mají vlastní instanci přes `createXStore()`
+  nad `data/demo*.json`, viz Demo parita výše). `/api/market` a `/api/analysts` se používají
+  beze změny (jsou obecné, bez vazby na konkrétní portfolio). `middleware.ts` má `PUBLIC_PATHS`
+  (`/demo`, `/api/demo/`, `/api/market`, `/api/analysts`), které obchází Basic Auth i na
+  produkci — zbytek webu (reálná data na `/`) zůstává chráněný beze změny. Sdílené UI
+  komponenty (`Kpi`, `Section`, `HoldingsTable`, `Wishlist`, `SectionVisibility`,
+  `SectionOrder`, …) jsou v `components/PortfolioUI.tsx` (a vlastních souborech), protože
+  Next.js nedovolí extra named exporty přímo z `page.tsx`.
 - **Finnhub odstraněn, appka teď nepotřebuje žádný API klíč** — sektor jede přes `lib/sector.ts`
   (stockanalysis.com), insider obchody přes
   `lib/nasdaqInsider.ts` (`api.nasdaq.com/api/company/<sym>/insider-trades`, funguje i pro
