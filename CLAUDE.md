@@ -206,7 +206,20 @@ Když přidáváš nový cache modul, čti/zapisuj přes `storage.ts`, ne přes 
 testování appky nevyžadovalo opakované zadávání přihlašovacích údajů. Na produkci se vynucuje
 jen když jsou nastavené `BASIC_AUTH_USER` + `BASIC_AUTH_PASSWORD` (jinak je web otevřený).
 Creds nejsou v repu — lokálně `.env.local`, na Netlify env. Porovnání hesla je constant-time
-(vlastní implementace — Edge Runtime nemá Node `crypto.timingSafeEqual`).
+(vlastní implementace — Edge Runtime nemá Node `crypto.timingSafeEqual`); uživatel a heslo se
+navíc vyhodnocují NEZÁVISLE (ne přes `&&`, které by se zkrátilo při špatném uživateli a
+prozradilo timing signál o tom, jestli sedělo aspoň jméno). `PUBLIC_PATHS`/`isPublicPath()` má
+hranici na `/` (exact match nebo prefix + `/`), aby budoucí routa jako `/demoXYZ` omylem
+nespadla pod veřejnou `/demo`.
+
+## Bezpečnostní limity proti zneužití veřejných demo rout
+`/api/demo/{wishlist,holding-alerts,section-visibility,section-order}` jsou veřejné bez
+přihlášení a bez rate limitu (viz Demo paritu výše) — kdokoliv na ně může poslat POST/PATCH.
+Aby nešlo `data/demo*.json` donekonečna nafukovat, `lib/{wishlist,holdingAlerts,
+sectionVisibility,sectionOrder}.ts` ořezávají/omezují vstup přímo v mutační funkci (ne jen na
+úrovni API routy, aby to platilo pro VŠECHNY volající): max. délka symbolu/jména/ID (20–200
+znaků) a max. počet položek (100–500, podle store). `/api/import` má navíc limit velikosti
+uploadu 20 MB (čte se celý soubor do paměti přes `Buffer.from`).
 
 ## Verzování
 Od v1.0.0 (2026-07-11) se appka verzuje: [Keep a Changelog](https://keepachangelog.com/) formát
@@ -255,9 +268,19 @@ Vždy nejdřív ověř dostupnost dat (prostředí blokuje zdroje), teprve pak s
 - **Git stav:** `main` je s `origin/main` sesynchronizované (poslední push obsahoval mobilní
   UX revizi + skeleton loading v1.3.0, senior UX/UI pass v1.4.0, veřejné demo + drobné opravy
   v1.5.0, odstranění Finnhubu/API klíče v1.6.0, wishlist + skrývání/přesouvání sekcí v1.7.0,
-  notifikace prohlížeče + alerty na pozicích v1.8.0, a plná demo parita + přepínač rozsahu
-  grafu + drobné opravy VIX/cen v1.9.0). Tagy `v1.0.0`–`v1.8.0` jsou pushnuté; `v1.9.0` viz
-  commit historie (může být pushnutý s `[skip netlify]`, aby nespustil deploy).
+  notifikace prohlížeče + alerty na pozicích v1.8.0, plná demo parita + přepínač rozsahu grafu
+  + drobné opravy VIX/cen v1.9.0, a bezpečnostní/dependency hardening v1.9.1). Tagy
+  `v1.0.0`–`v1.9.0` jsou pushnuté; `v1.9.1` viz commit historie (může být pushnutý s
+  `[skip netlify]`, aby nespustil deploy).
+- **Bezpečnostní kolo (v1.9.1, 2026-07-13)** — cílený audit (Basic Auth, upload/parsing, API
+  vstupy, cache klíče, XSS, secrety, CORS, nové demo routy) + kontrola zastaralých závislostí.
+  Žádný kritický nález. Opraveno: limity proti neomezenému zápisu do veřejných demo úložišť
+  (viz sekci „Bezpečnostní limity" výše), `encodeURIComponent` na 4 stockanalysis.com voláních,
+  timing side-channel v Basic Authu, `PUBLIC_PATHS` hranice, limit velikosti uploadu (20 MB),
+  `postcss`/`glob` bump (viz `package.json` `overrides`). **Vědomě ponecháno beze změny** (Petr
+  se rozhodl, neptát se znovu): Next.js 14→16 major upgrade (breaking, odloženo na samostatný
+  úkol) a `xlsx`/SheetJS CVE bez npm opravy (omezená expozice — `/api/import` je za Basic
+  Authem, jde jen o self-upload vlastního brokerova exportu).
 - **Demo paritа (v1.9.0)** — `/demo` má teď funkčně VŠECHNO co produkce, včetně wishlistu,
   cenových alertů na pozicích a skrývání/přesouvání sekcí, každé ve vlastní instanci přes
   tovární funkce (`createWishlistStore`, `createHoldingAlertsStore`,

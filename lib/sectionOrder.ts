@@ -49,10 +49,19 @@ export function createSectionOrderStore(cacheKey: string, defaultOrder: string[]
     return result;
   }
 
+  // Caps against unbounded growth from a malicious/malformed write — relevant mainly
+  // for the public, unauthenticated /demo instance of this store (see
+  // app/api/demo/section-order). `loadSectionOrder` above already filters down to
+  // known ids on read, so a garbage array can't corrupt what the app shows — this
+  // just keeps the file on disk from growing without bound in the meantime.
+  const MAX_ORDER_LEN = 100;
+  const MAX_ID_LEN = 60;
+
   function saveSectionOrder(order: string[]): Promise<string[]> {
     return serialized(async () => {
-      await writeJson(cacheKey, order);
-      return order;
+      const safeOrder = order.slice(0, MAX_ORDER_LEN).map((id) => id.slice(0, MAX_ID_LEN));
+      await writeJson(cacheKey, safeOrder);
+      return safeOrder;
     });
   }
 

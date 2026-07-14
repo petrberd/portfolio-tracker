@@ -11,6 +11,14 @@ import { readJson, writeJson } from "./storage";
  * portfolio's file.
  */
 
+// Caps against unbounded growth from repeated writes with novel ids — relevant
+// mainly for the public, unauthenticated /demo instance of this store (see
+// app/api/demo/section-visibility), which anyone can POST to without rate limiting.
+// The app only ever sends its own known section ids (a few dozen chars, well under
+// these caps), so legitimate use is unaffected.
+const MAX_ID_LEN = 60;
+const MAX_HIDDEN = 100;
+
 export function createSectionVisibilityStore(cacheKey: string) {
   async function loadHiddenSections(): Promise<string[]> {
     return (await readJson<string[]>(cacheKey)) ?? [];
@@ -31,7 +39,12 @@ export function createSectionVisibilityStore(cacheKey: string) {
   function setSectionHidden(id: string, hidden: boolean): Promise<string[]> {
     return serialized(async () => {
       const ids = await loadHiddenSections();
-      const next = hidden ? (ids.includes(id) ? ids : [...ids, id]) : ids.filter((x) => x !== id);
+      const safeId = id.slice(0, MAX_ID_LEN);
+      const next = hidden
+        ? ids.includes(safeId) || ids.length >= MAX_HIDDEN
+          ? ids
+          : [...ids, safeId]
+        : ids.filter((x) => x !== safeId);
       await writeJson(cacheKey, next);
       return next;
     });

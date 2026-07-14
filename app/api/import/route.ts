@@ -8,6 +8,11 @@ import { saveExport, type Broker } from "@/lib/store";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// A real XTB/Revolut export is at most a few MB even for a long trading history;
+// this just bounds how much an upload can force into memory (Buffer.from below reads
+// the whole file at once) — sits behind Basic Auth in production, but dev has none.
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+
 /**
  * Upload a broker export via multipart form-data: field "file" (.xlsx for
  * XTB, .csv for Revolut) + optional field "broker" ("xtb" | "revolut",
@@ -21,6 +26,9 @@ export async function POST(req: NextRequest) {
     const broker = (String(form.get("broker") ?? "xtb") === "revolut" ? "revolut" : "xtb") as Broker;
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Chybí soubor (pole 'file')." }, { status: 400 });
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json({ error: "Soubor je příliš velký (limit 20 MB)." }, { status: 413 });
     }
 
     const parsed =

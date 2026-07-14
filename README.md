@@ -1,6 +1,6 @@
 # Portfolio Tracker
 
-[![Version](https://img.shields.io/badge/version-1.9.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.9.1-blue)](CHANGELOG.md)
 
 Lokální webová aplikace na sledování investičního portfolia z **XTB a/nebo Revolutu** —
 po vzoru Alocano / Stonkee. Naimportuje export z brokera(ů), zrekonstruuje aktuální pozice
@@ -55,15 +55,16 @@ BASIC_AUTH_PASSWORD=...
 Když jsou obě vyplněné, celý web (i API) se schová za přihlašovací dialog (HTTP Basic Auth,
 řeší `middleware.ts`). Když jsou prázdné, web je bez hesla.
 
-## Security review (2026-07-11)
+## Security review
 
-Proběhla bezpečnostní kontrola zaměřená hlavně na to, jestli se dá ze stránky získat cokoliv
-bez znalosti Basic Auth hesla. Výsledek: **ne** — `middleware.ts` gatuje úplně vše (stránku
-i všechny API routy) kromě staticky kompilovaných Next.js assetů (`_next/static`, `_next/image`,
-`favicon.ico`), které žádná data neobsahují. Aplikace navíc není staticky exportovaná, takže
-žádná data nejsou "zapečená" v buildu.
+Appka prošla dvěma koly bezpečnostní kontroly, zaměřené hlavně na to, jestli se dá ze stránky
+získat cokoliv bez znalosti Basic Auth hesla, a jestli se dá zneužít nově přidané veřejné demo.
+Výsledek obou kol: žádný kritický nález. `middleware.ts` gatuje úplně vše (stránku i všechny
+API routy) kromě staticky kompilovaných Next.js assetů (`_next/static`, `_next/image`,
+`favicon.ico`), které žádná data neobsahují, a appka není staticky exportovaná, takže žádná
+data nejsou „zapečená" v buildu.
 
-Nalezené a opravené drobnosti:
+**2026-07-11:**
 - Porovnání Basic Auth hesla bylo přes `===`, což teoreticky umožňuje timing útok — nahrazeno
   vlastním constant-time porovnáním (Edge Runtime nemá Node `crypto.timingSafeEqual`).
 - Chybové hlášky z importu (`/api/import`) se vracely klientovi včetně detailu výjimky —
@@ -72,11 +73,29 @@ Nalezené a opravené drobnosti:
   explicitně vypnutý mimo `NODE_ENV=development`, aby nezávisel jen na tom, že na Netlify
   je nadřazená složka prázdná.
 
-Známé, vědomě přijaté riziko: knihovna `xlsx` (SheetJS) má na npm neopravené CVE
-(prototype pollution, ReDoS) — oficiální fix existuje jen na vlastním CDN SheetJS, ne na npm,
-takže by šlo o závislost mimo běžný registry. Zneužitelné jen nahráním škodlivého `.xlsx`
-přes `/api/import`, což je endpoint jen pro jednoho důvěryhodného uživatele za Basic Authem —
-reálné riziko je zanedbatelné.
+**2026-07-13** (po přidání veřejných demo zápisových rout — wishlist, alerty, skrývání/pořadí
+sekcí):
+- Veřejné, nepřihlášené demo routy neměly limit na délku vstupu ani počet položek — mohly
+  donekonečna růst přes `data/demo*.json`. Přidány limity (max. délka symbolu/jména/ID,
+  max. počet položek) do `lib/wishlist.ts`, `lib/holdingAlerts.ts`, `lib/sectionVisibility.ts`,
+  `lib/sectionOrder.ts` — platí pro produkci i demo.
+- 4 volání na stockanalysis.com neměla `encodeURIComponent` na `symbol` — sjednoceno.
+- `&&` mezi dvěma constant-time porovnáními hesla prozrazovalo drobný timing signál o tom,
+  jestli sedělo aspoň uživatelské jméno — teď se vyhodnocují nezávisle.
+- `PUBLIC_PATHS` prefix matching zpřísněn (hranice na `/`), aby případná budoucí routa jako
+  `/demoXYZ` omylem nespadla pod veřejnou `/demo`.
+- `/api/import` nemělo limit velikosti nahrávaného souboru — přidán limit 20 MB.
+- Zastaralé závislosti: `postcss` a `glob` opraveny (viz sekce Nasazení / `package.json`
+  `overrides`).
+
+Známá, vědomě přijatá rizika (viz komentáře v kódu i `CHANGELOG.md`):
+- `xlsx` (SheetJS) má na npm neopravené CVE (prototype pollution, ReDoS) — oficiální fix
+  existuje jen na vlastním CDN SheetJS, ne na npm. Zneužitelné jen nahráním škodlivého `.xlsx`
+  přes `/api/import`, což je endpoint jen pro jednoho důvěryhodného uživatele za Basic Authem —
+  reálné riziko je zanedbatelné.
+- Next.js 14.2.35 má více high-severity CVE opravených až v major verzi 16 (breaking upgrade,
+  odloženo na samostatný úkol) — týkají se hlavně funkcí, které appka nepoužívá (Image Optimizer
+  `remotePatterns`, streaming Server Components, i18n rewrites).
 
 ## Nasazení na Netlify
 

@@ -120,7 +120,7 @@ function resolveShallow(arr: unknown[], idx: number): any {
  * API which only returns data for Nasdaq-listed tickers.
  */
 async function fromStockAnalysis(symbol: string): Promise<DivMeta | null> {
-  const res = await fetch(`https://stockanalysis.com/stocks/${symbol.toLowerCase()}/dividend/__data.json`, {
+  const res = await fetch(`https://stockanalysis.com/stocks/${encodeURIComponent(symbol.toLowerCase())}/dividend/__data.json`, {
     headers: { "User-Agent": "Mozilla/5.0" },
   });
   if (!res.ok) return null;

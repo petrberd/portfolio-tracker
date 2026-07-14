@@ -26,6 +26,13 @@ export interface WishlistItem {
   alert?: WishlistAlert;
 }
 
+// Caps against unbounded growth from repeated writes with novel symbols — relevant
+// mainly for the public, unauthenticated /demo instance of this store (see
+// app/api/demo/wishlist), which anyone can POST to without rate limiting.
+const MAX_SYMBOL_LEN = 20;
+const MAX_NAME_LEN = 200;
+const MAX_ITEMS = 200;
+
 export function createWishlistStore(cacheKey: string) {
   async function loadWishlist(): Promise<WishlistItem[]> {
     return (await readJson<WishlistItem[]>(cacheKey)) ?? [];
@@ -55,8 +62,10 @@ export function createWishlistStore(cacheKey: string) {
   function addWishlistItem(symbol: string, name: string): Promise<WishlistItem[]> {
     return serialized(async () => {
       const items = await loadWishlist();
-      if (!items.some((i) => i.symbol === symbol)) {
-        items.push({ symbol, name, addedAt: new Date().toISOString() });
+      const safeSymbol = symbol.slice(0, MAX_SYMBOL_LEN);
+      const safeName = name.slice(0, MAX_NAME_LEN);
+      if (items.length < MAX_ITEMS && !items.some((i) => i.symbol === safeSymbol)) {
+        items.push({ symbol: safeSymbol, name: safeName, addedAt: new Date().toISOString() });
         await saveWishlist(items);
       }
       return items;

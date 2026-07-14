@@ -29,8 +29,11 @@ function timingSafeEqual(a: string, b: string): boolean {
 // /api/market (global VIX) and /api/analysts (ticker-keyed analyst consensus).
 const PUBLIC_PATHS = ["/demo", "/api/demo/", "/api/market", "/api/analysts"];
 
+// Exact match, or prefix match followed by "/" — so e.g. "/api/analysts" doesn't
+// accidentally also cover a future "/api/analysts-internal" route (defense in
+// depth; no such route exists today, but `startsWith` alone wouldn't catch it).
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p));
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p.endsWith("/") ? p : `${p}/`));
 }
 
 export function middleware(req: NextRequest) {
@@ -48,7 +51,12 @@ export function middleware(req: NextRequest) {
       const sep = decoded.indexOf(":");
       const gotUser = decoded.slice(0, sep);
       const gotPass = decoded.slice(sep + 1);
-      if (timingSafeEqual(gotUser, user) && timingSafeEqual(gotPass, pass)) {
+      // Evaluate both (not `&&`, which would short-circuit on a wrong username and
+      // skip the password check) so a wrong guess never finishes faster for getting
+      // the username right — that would leak a timing bit about it.
+      const userOk = timingSafeEqual(gotUser, user);
+      const passOk = timingSafeEqual(gotPass, pass);
+      if (userOk && passOk) {
         return NextResponse.next();
       }
     } catch {

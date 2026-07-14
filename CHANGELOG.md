@@ -4,6 +4,29 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.9.1] — 2026-07-13
+
+### Fixed
+- **Bezpečnostní tvrzení** — cílený audit (Basic Auth, upload/parsing, API vstupy, cache klíče,
+  XSS povrchy, secrety, CORS, nové veřejné demo routy). Žádný kritický nález; drobné opravy:
+  - Veřejné, nepřihlášené demo routy (`/api/demo/{wishlist,holding-alerts,section-visibility,
+    section-order}`) neměly žádný limit na délku vstupu ani počet položek — mohly donekonečna
+    růst přes `data/demo*.json`. Přidány limity (max. délka symbolu/jména/ID, max. počet
+    položek) do `lib/wishlist.ts`, `lib/holdingAlerts.ts`, `lib/sectionVisibility.ts`,
+    `lib/sectionOrder.ts` — platí pro produkci i demo.
+  - 4 volání na stockanalysis.com (`lib/analysts.ts`, `lib/sector.ts`, `lib/earnings.ts`,
+    `lib/divcalendar.ts`) neměla `encodeURIComponent` na `symbol` — sjednoceno se zbytkem kódu.
+  - Basic Auth (`middleware.ts`) — `&&` mezi dvěma constant-time porovnáními (uživatel/heslo)
+    prozrazovalo drobný timing signál o tom, jestli sedělo aspoň uživatelské jméno; teď se
+    vyhodnocují nezávisle. `PUBLIC_PATHS` prefix matching zpřísněn (hranice na `/`), aby
+    případná budoucí routa jako `/demoXYZ` omylem nespadla pod veřejnou `/demo`.
+  - `/api/import` nemělo limit velikosti nahrávaného souboru — přidán limit 20 MB.
+- **Zastaralé závislosti** — `postcss` 8.4.39 → 8.5.19 (moderate XSS ve stringify výstupu) a
+  `glob` vynucen na patchnutou 10.5.0 přes nový `overrides` blok v `package.json` (command
+  injection, jen v dev/eslint řetězci). Next.js 14→16 (více high CVE, ale major/breaking) a
+  `xlsx`/SheetJS (2 high CVE, oprava jen přes vlastní CDN SheetJS, ne npm) vědomě ponechány —
+  omezená expozice u obou (viz komentáře v kódu), řešení odloženo na samostatný úkol.
+
 ## [1.9.0] — 2026-07-13
 
 ### Added

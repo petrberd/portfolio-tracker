@@ -16,6 +16,12 @@ import { type PriceAlert } from "./priceAlert";
 
 export type HoldingAlerts = Record<string, PriceAlert>; // symbol -> alert
 
+// Caps against unbounded growth from repeated writes with novel symbols — relevant
+// mainly for the public, unauthenticated /demo instance of this store (see
+// app/api/demo/holding-alerts), which anyone can PATCH without rate limiting.
+const MAX_SYMBOL_LEN = 20;
+const MAX_ALERTS = 500;
+
 export function createHoldingAlertsStore(cacheKey: string) {
   async function loadHoldingAlerts(): Promise<HoldingAlerts> {
     return (await readJson<HoldingAlerts>(cacheKey)) ?? {};
@@ -37,8 +43,12 @@ export function createHoldingAlertsStore(cacheKey: string) {
   function setHoldingAlert(symbol: string, alert: PriceAlert | null): Promise<HoldingAlerts> {
     return serialized(async () => {
       const alerts = await loadHoldingAlerts();
-      if (alert) alerts[symbol] = alert;
-      else delete alerts[symbol];
+      const safeSymbol = symbol.slice(0, MAX_SYMBOL_LEN);
+      if (alert) {
+        if (safeSymbol in alerts || Object.keys(alerts).length < MAX_ALERTS) alerts[safeSymbol] = alert;
+      } else {
+        delete alerts[safeSymbol];
+      }
       await writeJson(cacheKey, alerts);
       return alerts;
     });

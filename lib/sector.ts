@@ -57,7 +57,7 @@ export async function fetchSector(symbol: string): Promise<string | null> {
   if (hit && Date.now() - hit.fetchedAt < TTL_MS) return hit.sector;
 
   try {
-    const url = `https://stockanalysis.com/stocks/${symbol.toLowerCase()}/__data.json`;
+    const url = `https://stockanalysis.com/stocks/${encodeURIComponent(symbol.toLowerCase())}/__data.json`;
     const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     if (!res.ok) throw new Error(`stockanalysis HTTP ${res.status}`);
     const json: any = await res.json();
