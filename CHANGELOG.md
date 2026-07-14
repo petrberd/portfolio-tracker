@@ -4,6 +4,15 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.9.5] — 2026-07-14
+
+### Changed
+- **Demo portfolio (`/demo`) rozšířeno o letošní obchody** — přidáno 8 nových nákupů z roku
+  2026 u existujících titulů (AAPL, MSFT, NVDA, AMZN, KO, O), měsíční vklady prodlouženy do
+  2026-07, aby zůstaly kryté hotovostí. Dividendový kalendář (`buildDemoExport`) dřív
+  generoval platby jen za 2024–2025, takže graf „Dividendy v čase" končil na 12/25 i po
+  přidání letošních obchodů — opraveno, teď jde do aktuálního měsíce (07/26).
+
 ## [1.9.4] — 2026-07-14
 
 ### Fixed

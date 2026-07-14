@@ -32,6 +32,14 @@ const BUYS: Buy[] = [
   { ticker: "JNJ.US", instrument: "Johnson & Johnson", date: "2024-05-15", shares: 15, price: 150 },
   { ticker: "O.US", instrument: "Realty Income", date: "2024-06-18", shares: 40, price: 58 },
   { ticker: "DIS.US", instrument: "Disney", date: "2024-08-22", shares: 12, price: 90 },
+  { ticker: "AAPL.US", instrument: "Apple", date: "2026-01-20", shares: 3, price: 245 },
+  { ticker: "AAPL.US", instrument: "Apple", date: "2026-04-15", shares: 3, price: 252 },
+  { ticker: "MSFT.US", instrument: "Microsoft", date: "2026-02-10", shares: 2, price: 445 },
+  { ticker: "NVDA.US", instrument: "Nvidia", date: "2026-01-12", shares: 8, price: 155 },
+  { ticker: "NVDA.US", instrument: "Nvidia", date: "2026-05-05", shares: 6, price: 168 },
+  { ticker: "AMZN.US", instrument: "Amazon", date: "2026-03-18", shares: 3, price: 215 },
+  { ticker: "KO.US", instrument: "Coca-Cola", date: "2026-02-25", shares: 10, price: 65 },
+  { ticker: "O.US", instrument: "Realty Income", date: "2026-04-08", shares: 15, price: 60 },
 ];
 
 /** Partial NVDA sell after its big run-up, so realized P/L shows up too. */
@@ -60,9 +68,10 @@ export function buildDemoExport(): ParsedExport {
   const cashOps: CashOp[] = [];
   let i = 0;
 
-  // Monthly deposits, 2024-01 through 2025-12.
-  for (let y = 2024; y <= 2025; y++) {
-    for (let m = 1; m <= 12; m++) {
+  // Monthly deposits, 2024-01 through 2026-07 (current month).
+  for (let y = 2024; y <= 2026; y++) {
+    const lastMonth = y === 2026 ? 7 : 12;
+    for (let m = 1; m <= lastMonth; m++) {
       const date = `${y}-${String(m).padStart(2, "0")}-05`;
       // An opening lump-sum transfer big enough to cover every buy below up front
       // (total ~414k CZK), then smaller regular top-ups — otherwise cumulative
@@ -111,12 +120,12 @@ export function buildDemoExport(): ParsedExport {
   }
 
   for (const p of DIVIDEND_PAYERS) {
-    for (const y of [2024, 2025]) {
+    for (const y of [2024, 2025, 2026]) {
       for (const m of p.months) {
-        // Skip payments before the position existed.
+        // Skip payments before the position existed, or after today.
         const date = `${y}-${String(m).padStart(2, "0")}-20`;
         const firstBuy = BUYS.find((b) => b.ticker === p.ticker)?.date ?? "2024-01-01";
-        if (date < firstBuy) continue;
+        if (date < firstBuy || date > "2026-07-14") continue;
         cashOps.push({
           type: "Dividend",
           ticker: p.ticker,
