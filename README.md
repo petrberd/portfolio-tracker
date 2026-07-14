@@ -55,48 +55,6 @@ BASIC_AUTH_PASSWORD=...
 Když jsou obě vyplněné, celý web (i API) se schová za přihlašovací dialog (HTTP Basic Auth,
 řeší `middleware.ts`). Když jsou prázdné, web je bez hesla.
 
-## Security review
-
-Appka prošla dvěma koly bezpečnostní kontroly, zaměřené hlavně na to, jestli se dá ze stránky
-získat cokoliv bez znalosti Basic Auth hesla, a jestli se dá zneužít nově přidané veřejné demo.
-Výsledek obou kol: žádný kritický nález. `middleware.ts` gatuje úplně vše (stránku i všechny
-API routy) kromě staticky kompilovaných Next.js assetů (`_next/static`, `_next/image`,
-`favicon.ico`), které žádná data neobsahují, a appka není staticky exportovaná, takže žádná
-data nejsou „zapečená" v buildu.
-
-**2026-07-11:**
-- Porovnání Basic Auth hesla bylo přes `===`, což teoreticky umožňuje timing útok — nahrazeno
-  vlastním constant-time porovnáním (Edge Runtime nemá Node `crypto.timingSafeEqual`).
-- Chybové hlášky z importu (`/api/import`) se vracely klientovi včetně detailu výjimky —
-  teď jde jen obecná zpráva, detail se loguje jen na serveru.
-- Lokální auto-import endpoint (`GET /api/import`, čte soubor z nadřazené složky) je teď
-  explicitně vypnutý mimo `NODE_ENV=development`, aby nezávisel jen na tom, že na Netlify
-  je nadřazená složka prázdná.
-
-**2026-07-13** (po přidání veřejných demo zápisových rout — wishlist, alerty, skrývání/pořadí
-sekcí):
-- Veřejné, nepřihlášené demo routy neměly limit na délku vstupu ani počet položek — mohly
-  donekonečna růst přes `data/demo*.json`. Přidány limity (max. délka symbolu/jména/ID,
-  max. počet položek) do `lib/wishlist.ts`, `lib/holdingAlerts.ts`, `lib/sectionVisibility.ts`,
-  `lib/sectionOrder.ts` — platí pro produkci i demo.
-- 4 volání na stockanalysis.com neměla `encodeURIComponent` na `symbol` — sjednoceno.
-- `&&` mezi dvěma constant-time porovnáními hesla prozrazovalo drobný timing signál o tom,
-  jestli sedělo aspoň uživatelské jméno — teď se vyhodnocují nezávisle.
-- `PUBLIC_PATHS` prefix matching zpřísněn (hranice na `/`), aby případná budoucí routa jako
-  `/demoXYZ` omylem nespadla pod veřejnou `/demo`.
-- `/api/import` nemělo limit velikosti nahrávaného souboru — přidán limit 20 MB.
-- Zastaralé závislosti: `postcss` a `glob` opraveny (viz sekce Nasazení / `package.json`
-  `overrides`).
-
-Známá, vědomě přijatá rizika (viz komentáře v kódu i `CHANGELOG.md`):
-- `xlsx` (SheetJS) má na npm neopravené CVE (prototype pollution, ReDoS) — oficiální fix
-  existuje jen na vlastním CDN SheetJS, ne na npm. Zneužitelné jen nahráním škodlivého `.xlsx`
-  přes `/api/import`, což je endpoint jen pro jednoho důvěryhodného uživatele za Basic Authem —
-  reálné riziko je zanedbatelné.
-- Next.js 14.2.35 má více high-severity CVE opravených až v major verzi 16 (breaking upgrade,
-  odloženo na samostatný úkol) — týkají se hlavně funkcí, které appka nepoužívá (Image Optimizer
-  `remotePatterns`, streaming Server Components, i18n rewrites).
-
 ## Nasazení na Netlify
 
 1. Nahraj repo na GitHub a v Netlify dej **Add new site → Import from Git**.
@@ -247,6 +205,48 @@ Lokálně v `data/` (gitignored), na Netlify přes Netlify Blobs (`lib/storage.t
   portfolia.
 
 Vše zůstává lokálně, nic se nikam neposílá. Jen pro osobní přehled — není to investiční poradenství.
+
+## Security review
+
+Appka prošla dvěma koly bezpečnostní kontroly, zaměřené hlavně na to, jestli se dá ze stránky
+získat cokoliv bez znalosti Basic Auth hesla, a jestli se dá zneužít nově přidané veřejné demo.
+Výsledek obou kol: žádný kritický nález. `middleware.ts` gatuje úplně vše (stránku i všechny
+API routy) kromě staticky kompilovaných Next.js assetů (`_next/static`, `_next/image`,
+`favicon.ico`), které žádná data neobsahují, a appka není staticky exportovaná, takže žádná
+data nejsou „zapečená" v buildu.
+
+**2026-07-11:**
+- Porovnání Basic Auth hesla bylo přes `===`, což teoreticky umožňuje timing útok — nahrazeno
+  vlastním constant-time porovnáním (Edge Runtime nemá Node `crypto.timingSafeEqual`).
+- Chybové hlášky z importu (`/api/import`) se vracely klientovi včetně detailu výjimky —
+  teď jde jen obecná zpráva, detail se loguje jen na serveru.
+- Lokální auto-import endpoint (`GET /api/import`, čte soubor z nadřazené složky) je teď
+  explicitně vypnutý mimo `NODE_ENV=development`, aby nezávisel jen na tom, že na Netlify
+  je nadřazená složka prázdná.
+
+**2026-07-13** (po přidání veřejných demo zápisových rout — wishlist, alerty, skrývání/pořadí
+sekcí):
+- Veřejné, nepřihlášené demo routy neměly limit na délku vstupu ani počet položek — mohly
+  donekonečna růst přes `data/demo*.json`. Přidány limity (max. délka symbolu/jména/ID,
+  max. počet položek) do `lib/wishlist.ts`, `lib/holdingAlerts.ts`, `lib/sectionVisibility.ts`,
+  `lib/sectionOrder.ts` — platí pro produkci i demo.
+- 4 volání na stockanalysis.com neměla `encodeURIComponent` na `symbol` — sjednoceno.
+- `&&` mezi dvěma constant-time porovnáními hesla prozrazovalo drobný timing signál o tom,
+  jestli sedělo aspoň uživatelské jméno — teď se vyhodnocují nezávisle.
+- `PUBLIC_PATHS` prefix matching zpřísněn (hranice na `/`), aby případná budoucí routa jako
+  `/demoXYZ` omylem nespadla pod veřejnou `/demo`.
+- `/api/import` nemělo limit velikosti nahrávaného souboru — přidán limit 20 MB.
+- Zastaralé závislosti: `postcss` a `glob` opraveny (viz sekce Nasazení / `package.json`
+  `overrides`).
+
+Známá, vědomě přijatá rizika (viz komentáře v kódu i `CHANGELOG.md`):
+- `xlsx` (SheetJS) má na npm neopravené CVE (prototype pollution, ReDoS) — oficiální fix
+  existuje jen na vlastním CDN SheetJS, ne na npm. Zneužitelné jen nahráním škodlivého `.xlsx`
+  přes `/api/import`, což je endpoint jen pro jednoho důvěryhodného uživatele za Basic Authem —
+  reálné riziko je zanedbatelné.
+- Next.js 14.2.35 má více high-severity CVE opravených až v major verzi 16 (breaking upgrade,
+  odloženo na samostatný úkol) — týkají se hlavně funkcí, které appka nepoužívá (Image Optimizer
+  `remotePatterns`, streaming Server Components, i18n rewrites).
 
 ## Technologie
 
