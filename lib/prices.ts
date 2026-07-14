@@ -83,6 +83,14 @@ async function saveSymbolMap(): Promise<void> {
  * enough to cover exchanges outside yahooSymbol()'s hardcoded suffix map,
  * unlike a single hardcoded fallback suffix.
  */
+// Shorter than fetchWithTimeout's 8s default: this whole resolution path can chain up to
+// 1 (raw check) + 1 (search) + up to 5 (one hasData per candidate) sequential requests for a
+// single not-yet-cached ticker — at the default timeout that's a 56s worst case, easily enough
+// on its own to blow past Netlify's function timeout (same class of bug as the divcalendar
+// fallback chain, fixed 2026-07-14). Once resolved, the result is cached indefinitely
+// (symbolMap.json), so this path only runs once per never-before-seen ticker.
+const RESOLVE_TIMEOUT_MS = 4000;
+
 async function resolveSymbol(raw: string): Promise<string> {
   if (!raw) return raw;
   const map = await loadSymbolMap();
@@ -92,7 +100,8 @@ async function resolveSymbol(raw: string): Promise<string> {
     try {
       const res = await fetchWithTimeout(
         `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=5d`,
-        { headers: { "User-Agent": "Mozilla/5.0" } }
+        { headers: { "User-Agent": "Mozilla/5.0" } },
+        RESOLVE_TIMEOUT_MS
       );
       if (!res.ok) return false;
       const json: any = await res.json();
@@ -107,7 +116,8 @@ async function resolveSymbol(raw: string): Promise<string> {
   try {
     const res = await fetchWithTimeout(
       `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(raw)}&quotesCount=5&newsCount=0`,
-      { headers: { "User-Agent": "Mozilla/5.0" } }
+      { headers: { "User-Agent": "Mozilla/5.0" } },
+      RESOLVE_TIMEOUT_MS
     );
     if (res.ok) {
       const json: any = await res.json();

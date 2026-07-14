@@ -71,10 +71,19 @@ const parseMoney = (s: unknown) => {
   return isNaN(n) ? 0 : n;
 };
 
+// Shorter than fetchWithTimeout's 8s default: fetchDividendMeta below tries up to 3 of these
+// sources one after another (Nasdaq -> stockanalysis.com -> Yahoo) when earlier ones don't
+// have the ticker, so the default would let one symbol's worst case reach 24s — on top of
+// the stock-detail route's other parallel fetches, that's what pushed a request over
+// Netlify's own function timeout (real incident, 2026-07-14).
+const DIV_SOURCE_TIMEOUT_MS = 5000;
+
 async function fromNasdaq(symbol: string): Promise<DivMeta | null> {
-  const res = await fetchWithTimeout(`https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/dividends?assetclass=stocks`, {
-    headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-  });
+  const res = await fetchWithTimeout(
+    `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/dividends?assetclass=stocks`,
+    { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } },
+    DIV_SOURCE_TIMEOUT_MS
+  );
   if (!res.ok) return null;
   const json: any = await res.json();
   const d = json?.data;
@@ -121,9 +130,11 @@ function resolveShallow(arr: unknown[], idx: number): any {
  * API which only returns data for Nasdaq-listed tickers.
  */
 async function fromStockAnalysis(symbol: string): Promise<DivMeta | null> {
-  const res = await fetchWithTimeout(`https://stockanalysis.com/stocks/${encodeURIComponent(symbol.toLowerCase())}/dividend/__data.json`, {
-    headers: { "User-Agent": "Mozilla/5.0" },
-  });
+  const res = await fetchWithTimeout(
+    `https://stockanalysis.com/stocks/${encodeURIComponent(symbol.toLowerCase())}/dividend/__data.json`,
+    { headers: { "User-Agent": "Mozilla/5.0" } },
+    DIV_SOURCE_TIMEOUT_MS
+  );
   if (!res.ok) return null;
   const json: any = await res.json();
   const nodes: any[] = json?.nodes ?? [];
@@ -162,7 +173,8 @@ async function fromStockAnalysis(symbol: string): Promise<DivMeta | null> {
 async function fromYahoo(symbol: string): Promise<DivMeta | null> {
   const res = await fetchWithTimeout(
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y&events=div`,
-    { headers: { "User-Agent": "Mozilla/5.0" } }
+    { headers: { "User-Agent": "Mozilla/5.0" } },
+    DIV_SOURCE_TIMEOUT_MS
   );
   if (!res.ok) return null;
   const json: any = await res.json();

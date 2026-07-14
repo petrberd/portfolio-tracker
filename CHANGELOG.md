@@ -4,6 +4,16 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.9.3] — 2026-07-14
+
+### Fixed
+- **`/api/stockdetail` a `/api/demo/stockdetail` pořád padaly s 502 i po v1.9.2** — dvě
+  místa dělají SEKVENČNÍ řetězec fallbacků, kde se timeouty sčítají: `lib/divcalendar.ts`'s
+  `fetchDividendMeta` zkouší Nasdaq → stockanalysis.com → Yahoo (až 3× 8s = 24s), a
+  `lib/prices.ts`'s `resolveSymbol` zkouší přímý symbol → search → až 5 kandidátů (až 7× 8s =
+  56s worst case) pro dosud nerozpoznaný ticker. Timeouty zkráceny na 5s (dividend fallback)
+  a 4s (symbol resolution), aby zbyla rezerva na zbytek requestu.
+
 ## [1.9.2] — 2026-07-14
 
 ### Fixed
