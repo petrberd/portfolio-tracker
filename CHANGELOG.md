@@ -4,6 +4,17 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.9.4] — 2026-07-14
+
+### Fixed
+- **Celý web pořád padal s 500/502 na produkci i po v1.9.3** — potvrzeno živě, že
+  `fetch(url, { signal: AbortSignal.timeout(ms) })` v tomhle Next.js/Netlify runtime timeout
+  spolehlivě nedodržuje: i `/api/market` (jediné volání na Yahoo) padalo přesně na ~30s (limit
+  Netlify funkce), bez ohledu na mnohem kratší nastavený `signal` timeout. `lib/httpFetch.ts`
+  přepsán na `Promise.race` proti obyčejnému `setTimeout` rejection — nezávisí na tom, jestli
+  `fetch()` signál doopravdy respektuje, jen zaručí, že se volající kód dočká odpovědi/chyby
+  včas.
+
 ## [1.9.3] — 2026-07-14
 
 ### Fixed
