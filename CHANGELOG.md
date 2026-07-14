@@ -4,6 +4,17 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 verzování z [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
 **MAJOR** = zásadní/breaking změna, **MINOR** = nová funkce, **PATCH** = oprava.
 
+## [1.9.2] — 2026-07-14
+
+### Fixed
+- **Appka padala na Netlify s 500/502** (`/api/portfolio`, `/api/demo/portfolio`,
+  `/api/demo/earnings` po ~30 s) — žádné externí volání (Yahoo, stockanalysis.com, Nasdaq)
+  nemělo timeout, takže jedno zaseknuté/pomalé spojení zablokovalo celý request, dokud ho
+  nezabil timeout Netlify funkce. Nový `lib/httpFetch.ts` (`fetchWithTimeout`, 8s) nasazen na
+  všechna externí volání v `lib/{prices,analysts,sector,earnings,divcalendar,nasdaqInsider,
+  fundamentals,news}.ts`. Lokálně (rychlá, spolehlivá síť) se to neprojevovalo — objevilo se
+  až při skutečném nasazení a provozu na Netlify.
+
 ## [1.9.1] — 2026-07-13
 
 ### Fixed

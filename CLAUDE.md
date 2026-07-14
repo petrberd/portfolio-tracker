@@ -36,6 +36,12 @@ Next.js 14 (App Router) · TypeScript · Recharts · SheetJS (xlsx) · Tailwind 
   (pro daňový časový test) a roční hrubý příjem z prodejů (`taxYearSoldCzk`).
 - `lib/taxtest.ts` — časový test (§4/1/w ZDP): exemptDate = nákup + 3 roky + 1 den, po FIFO tranších.
   Čistě výpočetní, žádné externí volání.
+- `lib/httpFetch.ts` — `fetchWithTimeout()`, tenký wrapper nad `fetch()` s tvrdým timeoutem
+  (8s, `AbortSignal.timeout`). Používá ho VŠECHNO externí volání v `lib/*.ts` (Yahoo,
+  stockanalysis.com, Nasdaq) — bez toho jedno zaseknuté spojení blokovalo celý request, dokud
+  ho nezabil timeout Netlify funkce (reálný incident 2026-07-14, `/api/portfolio` a
+  `/api/demo/*` padaly s 500/502 po ~30s na produkci; lokálně kvůli rychlé síti neviditelné).
+  Nový externí fetch v `lib/*.ts` → vždy přes `fetchWithTimeout`, ne holý `fetch()`.
 - `lib/prices.ts` — ceny z Yahoo. `fetchChart` (range=max, cachováno 1h), `fetchDailyCloses`
   (`interval` volitelný, default denní `1d` — pro detailní grafy i pro skutečnou denní %
   změnu; nedenní `interval` např. `15m`/`60m` vrací plný ISO timestamp místo useknutého

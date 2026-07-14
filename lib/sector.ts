@@ -1,4 +1,5 @@
 import { readJson, writeJson } from "./storage";
+import { fetchWithTimeout } from "./httpFetch";
 
 /**
  * Sector/industry per ticker, from stockanalysis.com's main stock page data
@@ -58,7 +59,7 @@ export async function fetchSector(symbol: string): Promise<string | null> {
 
   try {
     const url = `https://stockanalysis.com/stocks/${encodeURIComponent(symbol.toLowerCase())}/__data.json`;
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const res = await fetchWithTimeout(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     if (!res.ok) throw new Error(`stockanalysis HTTP ${res.status}`);
     const json: any = await res.json();
 

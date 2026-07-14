@@ -1,4 +1,5 @@
 import { readJson, writeJson } from "./storage";
+import { fetchWithTimeout } from "./httpFetch";
 
 /**
  * Insider transactions per ticker, from Nasdaq's public company API — same
@@ -63,7 +64,7 @@ export async function fetchInsiderTransactions(symbol: string, limit = 12): Prom
 
   try {
     const url = `https://api.nasdaq.com/api/company/${encodeURIComponent(symbol)}/insider-trades?limit=100&type=ALL`;
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } });
+    const res = await fetchWithTimeout(url, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } });
     if (!res.ok) throw new Error(`Nasdaq HTTP ${res.status}`);
     const json: any = await res.json();
     const rows: any[] = json?.data?.transactionTable?.table?.rows ?? [];

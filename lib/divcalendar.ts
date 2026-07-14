@@ -1,4 +1,5 @@
 import { readJson, writeJson } from "./storage";
+import { fetchWithTimeout } from "./httpFetch";
 
 /**
  * Dividend schedule per symbol: payment frequency, amount per share, and the
@@ -71,7 +72,7 @@ const parseMoney = (s: unknown) => {
 };
 
 async function fromNasdaq(symbol: string): Promise<DivMeta | null> {
-  const res = await fetch(`https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/dividends?assetclass=stocks`, {
+  const res = await fetchWithTimeout(`https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/dividends?assetclass=stocks`, {
     headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
   });
   if (!res.ok) return null;
@@ -120,7 +121,7 @@ function resolveShallow(arr: unknown[], idx: number): any {
  * API which only returns data for Nasdaq-listed tickers.
  */
 async function fromStockAnalysis(symbol: string): Promise<DivMeta | null> {
-  const res = await fetch(`https://stockanalysis.com/stocks/${encodeURIComponent(symbol.toLowerCase())}/dividend/__data.json`, {
+  const res = await fetchWithTimeout(`https://stockanalysis.com/stocks/${encodeURIComponent(symbol.toLowerCase())}/dividend/__data.json`, {
     headers: { "User-Agent": "Mozilla/5.0" },
   });
   if (!res.ok) return null;
@@ -159,7 +160,7 @@ async function fromStockAnalysis(symbol: string): Promise<DivMeta | null> {
 }
 
 async function fromYahoo(symbol: string): Promise<DivMeta | null> {
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y&events=div`,
     { headers: { "User-Agent": "Mozilla/5.0" } }
   );

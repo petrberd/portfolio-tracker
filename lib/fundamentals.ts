@@ -1,4 +1,5 @@
 import { readJson, writeJson } from "./storage";
+import { fetchWithTimeout } from "./httpFetch";
 
 /**
  * Company fundamentals from Yahoo's public `fundamentals-timeseries` endpoint
@@ -61,7 +62,7 @@ export async function fetchFundamentals(symbol: string, force = false): Promise<
     const url =
       `https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(symbol)}` +
       `?symbol=${encodeURIComponent(symbol)}&type=${TYPES.join(",")}&period1=1420070400&period2=1893456000`;
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const res = await fetchWithTimeout(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     if (!res.ok) throw new Error(`Yahoo fundamentals HTTP ${res.status}`);
     const json: any = await res.json();
     const results: any[] = json?.timeseries?.result ?? [];

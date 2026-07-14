@@ -1,4 +1,5 @@
 import { readJson, writeJson } from "./storage";
+import { fetchWithTimeout } from "./httpFetch";
 
 /**
  * Next earnings report date per ticker, from stockanalysis.com's main stock
@@ -47,7 +48,7 @@ function resolveShallow(arr: unknown[], idx: number): any {
 }
 
 async function fetchRaw(symbol: string): Promise<string | null> {
-  const res = await fetch(`https://stockanalysis.com/stocks/${encodeURIComponent(symbol.toLowerCase())}/__data.json`, {
+  const res = await fetchWithTimeout(`https://stockanalysis.com/stocks/${encodeURIComponent(symbol.toLowerCase())}/__data.json`, {
     headers: { "User-Agent": "Mozilla/5.0" },
   });
   if (!res.ok) return null;

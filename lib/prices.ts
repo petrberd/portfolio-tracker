@@ -1,4 +1,5 @@
 import { readJson, writeJson } from "./storage";
+import { fetchWithTimeout } from "./httpFetch";
 
 /**
  * Price data straight from Yahoo's public chart JSON endpoint on query1
@@ -89,7 +90,7 @@ async function resolveSymbol(raw: string): Promise<string> {
 
   const hasData = async (sym: string): Promise<boolean> => {
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=5d`,
         { headers: { "User-Agent": "Mozilla/5.0" } }
       );
@@ -104,7 +105,7 @@ async function resolveSymbol(raw: string): Promise<string> {
   if (await hasData(raw)) return raw; // works as-is — nothing to cache, this is the default path
 
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(raw)}&quotesCount=5&newsCount=0`,
       { headers: { "User-Agent": "Mozilla/5.0" } }
     );
@@ -139,7 +140,7 @@ export async function searchSymbols(query: string): Promise<SymbolSuggestion[]> 
   const q = query.trim();
   if (!q) return [];
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=8&newsCount=0`,
       { headers: { "User-Agent": "Mozilla/5.0" } }
     );
@@ -162,7 +163,7 @@ async function fetchChartRaw(symbol: string): Promise<Chart | null> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
     symbol
   )}?interval=1d&range=max`;
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+  const res = await fetchWithTimeout(url, { headers: { "User-Agent": "Mozilla/5.0" } });
   if (!res.ok) throw new Error(`Yahoo HTTP ${res.status}`);
   const json: any = await res.json();
   const result = json?.chart?.result?.[0];
@@ -284,7 +285,7 @@ export async function fetchDailyCloses(symbol: string, range = "2y", interval = 
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
       resolved
     )}?interval=${interval}&range=${range}`;
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 3600 } });
+    const res = await fetchWithTimeout(url, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 3600 } });
     if (!res.ok) throw new Error(`Yahoo HTTP ${res.status}`);
     const json: any = await res.json();
     const result = json?.chart?.result?.[0];

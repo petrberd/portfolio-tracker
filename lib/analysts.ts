@@ -1,4 +1,5 @@
 import { readJson, writeJson } from "./storage";
+import { fetchWithTimeout } from "./httpFetch";
 
 /**
  * Analyst price targets and rating breakdown, scraped from stockanalysis.com's
@@ -92,7 +93,7 @@ export async function fetchAnalysts(symbol: string, force = false): Promise<Anal
 
   try {
     const url = `https://stockanalysis.com/stocks/${encodeURIComponent(symbol.toLowerCase())}/__data.json`;
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const res = await fetchWithTimeout(url, { headers: { "User-Agent": "Mozilla/5.0" } });
     if (!res.ok) throw new Error(`stockanalysis HTTP ${res.status}`);
     const json: any = await res.json();
 
